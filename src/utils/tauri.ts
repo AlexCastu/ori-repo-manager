@@ -40,9 +40,12 @@ export async function saveConfig(config: AppConfig): Promise<void> {
   return invoke<void>('save_config', { config });
 }
 
-export async function openInVscode(projectPath: string): Promise<void> {
+export async function openInIDE(projectPath: string): Promise<void> {
   return invoke<void>('open_in_vscode', { projectPath });
 }
+
+// Alias para compatibilidad
+export const openInVscode = openInIDE;
 
 export async function openInExplorer(projectPath: string): Promise<void> {
   return invoke<void>('open_in_explorer', { projectPath });

@@ -90,13 +90,23 @@ export const useStore = create<AppStore>()(
 
       // Save config
       saveConfig: async () => {
-        const { environments, favorites, config } = get();
+        const { environments, favorites, config, projects, activeEnvironmentId } = get();
         if (!config) return;
+
+        // Update projects cache for active environment
+        const projectsCache = { ...config.projectsCache };
+        if (activeEnvironmentId && projects.length > 0) {
+          projectsCache[activeEnvironmentId] = projects.reduce((acc, p) => {
+            acc[p.name] = p;
+            return acc;
+          }, {} as Record<string, Project>);
+        }
 
         const updatedConfig: AppConfig = {
           ...config,
           environments,
           favorites,
+          projectsCache,
         };
 
         try {
@@ -203,20 +213,27 @@ export const useStore = create<AppStore>()(
       },
 
       deleteEnvironment: (id) => {
-        const { environments, activeEnvironmentId } = get();
+        const { environments, activeEnvironmentId, config } = get();
         const env = environments.find(e => e.id === id);
+
+        // Remove from cache
+        const projectsCache = { ...config?.projectsCache };
+        if (projectsCache[id]) {
+          delete projectsCache[id];
+        }
 
         set((state) => ({
           environments: state.environments.filter((e) => e.id !== id),
           activeEnvironmentId: activeEnvironmentId === id ? null : activeEnvironmentId,
           projects: activeEnvironmentId === id ? [] : state.projects,
+          config: state.config ? { ...state.config, projectsCache } : state.config,
         }));
 
         get().saveConfig();
         get().addToast({
           type: 'success',
           title: 'Entorno eliminado',
-          message: env ? `${env.name} eliminado` : 'Entorno eliminado',
+          message: env ? `${env.name} eliminado correctamente` : 'Entorno eliminado',
         });
       },
 

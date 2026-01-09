@@ -20,7 +20,7 @@ import type { Project, GitStatus } from '../types';
 import { useStore } from '../store/useStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn, getPlatformColor } from '../utils/helpers';
-import { openInVscode, openInExplorer, getGitStatus, gitFetch } from '../utils/tauri';
+import { openInIDE, openInExplorer, getGitStatus, gitFetch } from '../utils/tauri';
 
 interface ProjectCardCompactProps {
   project: Project;
@@ -71,14 +71,14 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
     }
   };
 
-  const handleOpenVSCode = async () => {
+  const handleOpenIDE = async () => {
     try {
-      await openInVscode(project.path);
-    } catch {
+      await openInIDE(project.path);
+    } catch (error) {
       addToast({
         type: 'error',
         title: 'Error',
-        message: 'No se pudo abrir VS Code',
+        message: 'No se pudo abrir el IDE',
       });
     }
   };
@@ -217,12 +217,12 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
 
       {/* Action Buttons - Right Side */}
       <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        {/* VS Code */}
+        {/* IDE */}
         <button
-          onClick={handleOpenVSCode}
+          onClick={handleOpenIDE}
           className="p-2 hover:bg-white/10 rounded-lg transition-colors"
           style={{ color: colors.primary }}
-          title="Abrir en VS Code"
+          title="Abrir en IDE"
         >
           <ExternalLink className="w-4 h-4" />
         </button>

@@ -20,7 +20,7 @@ import {
 import type { Project, GitStatus } from '../types';
 import { useStore } from '../store/useStore';
 import { cn, getPlatformColor } from '../utils/helpers';
-import { openInVscode, openInExplorer, getGitStatus, gitFetch } from '../utils/tauri';
+import { openInIDE, openInExplorer, getGitStatus, gitFetch } from '../utils/tauri';
 
 interface ProjectCardProps {
   project: Project;
@@ -68,14 +68,14 @@ export function ProjectCard({ project, index }: ProjectCardProps) {
     }
   };
 
-  const handleOpenVSCode = async () => {
+  const handleOpenIDE = async () => {
     try {
-      await openInVscode(project.path);
+      await openInIDE(project.path);
     } catch (error) {
       addToast({
         type: 'error',
         title: 'Error',
-        message: 'No se pudo abrir VS Code. Verifica que esté instalado y en el PATH.',
+        message: 'No se pudo abrir el IDE. Verifica que esté instalado y en el PATH.',
       });
     }
   };
@@ -311,16 +311,16 @@ export function ProjectCard({ project, index }: ProjectCardProps) {
 
       {/* Action Buttons - Direct Access */}
       <div className="flex items-center gap-2 pt-3 border-t border-white/5">
-        {/* VS Code Button */}
+        {/* IDE Button */}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={handleOpenVSCode}
+          onClick={handleOpenIDE}
           className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-2"
-          title="Abrir en VS Code"
+          title="Abrir en IDE"
         >
           <ExternalLink className="w-3.5 h-3.5" />
-          VS Code
+          IDE
         </motion.button>
 
         {/* Folder Button */}
