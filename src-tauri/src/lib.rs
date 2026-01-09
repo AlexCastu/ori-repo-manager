@@ -15,10 +15,22 @@ pub struct Environment {
     pub base_path: String,
     #[serde(rename = "gitServer")]
     pub git_server: String,
+    #[serde(default = "default_color")]
+    pub color: String,
+    #[serde(default = "default_icon")]
+    pub icon: String,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+fn default_color() -> String {
+    "emerald".to_string()
+}
+
+fn default_icon() -> String {
+    "folder".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

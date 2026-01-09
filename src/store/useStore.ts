@@ -45,6 +45,7 @@ export const useStore = create<AppStore>()(
       gitPullModal: { isOpen: false },
       settingsModal: { isOpen: false },
       gitVariablesModal: { isOpen: false },
+      deleteEnvironmentModal: { isOpen: false },
 
       // Initialize app
       initialize: async () => {
@@ -360,6 +361,13 @@ export const useStore = create<AppStore>()(
       },
       closeGitVariablesModal: () => {
         set({ gitVariablesModal: { isOpen: false } });
+      },
+
+      openDeleteEnvironmentModal: (data) => {
+        set({ deleteEnvironmentModal: { isOpen: true, data } });
+      },
+      closeDeleteEnvironmentModal: () => {
+        set({ deleteEnvironmentModal: { isOpen: false } });
       },
     }),
     {

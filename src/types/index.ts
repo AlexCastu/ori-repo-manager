@@ -139,6 +139,10 @@ export interface GitVariablesModalData {
   // No data needed, just opens the modal
 }
 
+export interface DeleteEnvironmentModalData {
+  environment: Environment;
+}
+
 export interface FavoriteNoteModalData {
   projectName: string;
   currentNote: string;
@@ -184,6 +188,7 @@ export interface UISlice {
   gitPullModal: ModalState & { data?: GitPullModalData };
   settingsModal: ModalState & { data?: SettingsModalData };
   gitVariablesModal: ModalState & { data?: GitVariablesModalData };
+  deleteEnvironmentModal: ModalState & { data?: DeleteEnvironmentModalData };
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
   removeToast: (id: string) => void;
   openEnvironmentModal: (data: EnvironmentModalData) => void;
@@ -200,6 +205,8 @@ export interface UISlice {
   closeSettingsModal: () => void;
   openGitVariablesModal: () => void;
   closeGitVariablesModal: () => void;
+  openDeleteEnvironmentModal: (data: DeleteEnvironmentModalData) => void;
+  closeDeleteEnvironmentModal: () => void;
 }
 
 export type AppStore = EnvironmentsSlice & ProjectsSlice & FavoritesSlice & UISlice & {

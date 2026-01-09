@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Folder, Server, FolderOpen, Trash2, AlertTriangle, Palette,
+  X, Folder, Server, FolderOpen, Trash2, Palette,
   Code, Database, Cloud, Globe, Rocket, Star, Zap, Box, Layers, GitBranch
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -31,7 +31,7 @@ export function EnvironmentModal() {
     closeEnvironmentModal,
     addEnvironment,
     updateEnvironment,
-    deleteEnvironment,
+    openDeleteEnvironmentModal,
     addToast,
   } = useStore();
 
@@ -44,7 +44,6 @@ export function EnvironmentModal() {
   const [gitServer, setGitServer] = useState('');
   const [selectedColor, setSelectedColor] = useState<EnvironmentColor>(defaultEnvironmentColor);
   const [selectedIcon, setSelectedIcon] = useState<EnvironmentIcon>(defaultEnvironmentIcon);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -61,7 +60,6 @@ export function EnvironmentModal() {
       setSelectedColor(defaultEnvironmentColor);
       setSelectedIcon(defaultEnvironmentIcon);
     }
-    setShowDeleteConfirm(false);
   }, [isOpen, isEditMode, existingEnv]);
 
   const handleSelectDirectory = async () => {
@@ -117,10 +115,10 @@ export function EnvironmentModal() {
     closeEnvironmentModal();
   };
 
-  const handleDelete = () => {
+  const handleOpenDeleteModal = () => {
     if (existingEnv) {
-      deleteEnvironment(existingEnv.id);
       closeEnvironmentModal();
+      openDeleteEnvironmentModal({ environment: existingEnv });
     }
   };
 
@@ -309,45 +307,6 @@ export function EnvironmentModal() {
                   </div>
                 </div>
               </div>
-
-              {/* Delete Confirmation */}
-              {isEditMode && showDeleteConfirm && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl"
-                >
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-red-300 font-medium">
-                        ¿Eliminar este entorno?
-                      </p>
-                      <p className="text-xs text-red-400/70 mt-1">
-                        Esta acción no se puede deshacer. Los proyectos no serán eliminados.
-                      </p>
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          type="button"
-                          onClick={handleDelete}
-                          className="px-3 py-1.5 bg-red-500 text-white text-sm font-medium
-                                     rounded-lg hover:bg-red-600 transition-colors"
-                        >
-                          Sí, eliminar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowDeleteConfirm(false)}
-                          className="px-3 py-1.5 bg-dark-800 text-gray-300 text-sm
-                                     rounded-lg hover:bg-dark-700 transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
             </form>
 
             {/* Actions - Footer outside scroll */}
@@ -355,7 +314,7 @@ export function EnvironmentModal() {
               {isEditMode ? (
                 <button
                   type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
+                  onClick={handleOpenDeleteModal}
                   className="text-red-400 hover:text-red-300 text-sm font-medium
                              flex items-center gap-2 transition-colors"
                 >

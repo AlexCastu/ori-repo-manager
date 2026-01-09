@@ -12,6 +12,7 @@ import { GitPullModal } from './components/GitPullModal';
 import { GitCloneModal } from './components/GitCloneModal';
 import { SettingsModal } from './components/SettingsModal';
 import { GitVariablesModal } from './components/GitVariablesModal';
+import { DeleteEnvironmentModal } from './components/DeleteEnvironmentModal';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useStore } from './store/useStore';
 
@@ -62,6 +63,7 @@ function App() {
         <GitCloneModal />
         <SettingsModal />
         <GitVariablesModal />
+        <DeleteEnvironmentModal />
 
         {/* Toasts */}
         <ToastContainer />
