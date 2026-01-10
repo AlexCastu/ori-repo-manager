@@ -14,12 +14,14 @@ import {
   RefreshCw,
   MoreVertical,
   Settings,
-  MessageSquare
+  MessageSquare,
+  Copy,
+  Link as LinkIcon
 } from 'lucide-react';
 import type { Project, GitStatus } from '../types';
 import { useStore } from '../store/useStore';
 import { useTheme } from '../contexts/ThemeContext';
-import { cn, getPlatformColor } from '../utils/helpers';
+import { cn } from '../utils/helpers';
 import { openInIDE, openInExplorer, getGitStatus, gitFetch } from '../utils/tauri';
 
 interface ProjectCardCompactProps {
@@ -95,6 +97,24 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
     }
   };
 
+  const handleCopyUrl = async () => {
+    if (!project.gitUrl) return;
+    try {
+      await navigator.clipboard.writeText(project.gitUrl);
+      addToast({
+        type: 'success',
+        title: 'Copiado',
+        message: 'URL del repositorio copiada al portapapeles',
+      });
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo copiar la URL',
+      });
+    }
+  };
+
   const handlePull = () => {
     if (!project.hasGit) return;
     openGitPullModal({
@@ -122,25 +142,37 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.02, duration: 0.2 }}
-      className="group relative flex items-center gap-3 px-4 py-3 bg-dark-900/40 hover:bg-dark-800/60
-                 border border-white/5 hover:border-white/10 rounded-xl transition-all duration-200"
-      onMouseLeave={() => setShowMenu(false)}
+      className="group relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200"
+      style={{
+        background: 'rgba(15, 31, 55, 0.6)',
+        border: '1px solid rgba(99, 163, 255, 0.2)'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'rgba(15, 31, 55, 0.8)';
+        e.currentTarget.style.borderColor = 'rgba(99, 163, 255, 0.4)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'rgba(15, 31, 55, 0.6)';
+        e.currentTarget.style.borderColor = 'rgba(99, 163, 255, 0.2)';
+        setShowMenu(false);
+      }}
     >
       {/* Favorite Button */}
       <button
         onClick={() => toggleFavorite(project.name)}
         className={cn(
-          'p-1 rounded-lg transition-all duration-200 flex-shrink-0',
+          'p-1 rounded-xl transition-all duration-200 flex-shrink-0',
           isFavorite
-            ? 'text-yellow-400'
-            : 'text-gray-600 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
+            ? ''
+            : 'opacity-0 group-hover:opacity-100'
         )}
+        style={{ color: isFavorite ? '#fcd34d' : '#D1D5DB' }}
       >
         <Star className={cn('w-4 h-4', isFavorite && 'fill-current')} />
       </button>
 
       {/* Platform Icon */}
-      <div className={cn('flex-shrink-0', getPlatformColor(project.platform))}>
+      <div className="flex-shrink-0" style={{ color: '#3B82F6' }}>
         {getPlatformIcon()}
       </div>
 
@@ -151,14 +183,38 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
             {project.name}
           </h3>
           {gitStatus?.branch && (
-            <span className="text-xs text-gray-500 hidden sm:flex items-center gap-1 flex-shrink-0">
+            <span className="text-xs hidden sm:flex items-center gap-1 flex-shrink-0" style={{ color: '#D1D5DB' }}>
               <GitBranch className="w-3 h-3" />
               {gitStatus.branch}
             </span>
           )}
         </div>
+        {project.gitUrl && (
+          <div className="flex items-center gap-1 mt-0.5 group/url">
+            <LinkIcon className="w-3 h-3 flex-shrink-0" style={{ color: '#3B82F6' }} />
+            <span className="text-xs truncate flex-1" style={{ color: '#63A3FF' }}>
+              {project.gitUrl}
+            </span>
+            <button
+              onClick={handleCopyUrl}
+              className="opacity-0 group-hover/url:opacity-100 p-1 rounded transition-all duration-200"
+              style={{ color: '#D1D5DB' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                e.currentTarget.style.color = '#FFFFFF';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#D1D5DB';
+              }}
+              title="Copiar URL"
+            >
+              <Copy className="w-3 h-3" />
+            </button>
+          </div>
+        )}
         {favoriteNote && (
-          <p className="text-xs text-gray-500 truncate mt-0.5">
+          <p className="text-xs truncate mt-0.5" style={{ color: '#D1D5DB' }}>
             <MessageSquare className="w-3 h-3 inline mr-1" />
             {favoriteNote}
           </p>
@@ -168,21 +224,29 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
       {/* Status Badges */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {isLoadingStatus ? (
-          <RefreshCw className="w-3.5 h-3.5 text-gray-500 animate-spin" />
+          <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ color: '#3B82F6' }} />
         ) : (
           <>
             {isUpToDate && (
               <span
                 className="w-6 h-6 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: `${colors.primary}20` }}
+                style={{
+                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                  boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)'
+                }}
                 title="Actualizado"
               >
-                <Check className="w-3.5 h-3.5" style={{ color: colors.primary }} />
+                <Check className="w-3.5 h-3.5" style={{ color: '#10B981' }} />
               </span>
             )}
             {hasUncommittedChanges && (
               <span
-                className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full flex items-center gap-1"
+                className="px-2 py-0.5 text-xs rounded-full flex items-center gap-1"
+                style={{
+                  backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                  color: '#fcd34d',
+                  border: '1px solid rgba(245, 158, 11, 0.3)'
+                }}
                 title="Cambios sin commitear"
               >
                 <AlertCircle className="w-3 h-3" />
@@ -190,7 +254,12 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
             )}
             {hasCommitsToPush && (
               <span
-                className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1"
+                className="px-2 py-0.5 text-xs rounded-full flex items-center gap-1"
+                style={{
+                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                  color: '#93c5fd',
+                  border: '1px solid rgba(59, 130, 246, 0.3)'
+                }}
                 title={`${gitStatus!.ahead} commits para subir`}
               >
                 <Upload className="w-3 h-3" />
@@ -199,7 +268,13 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
             )}
             {hasCommitsToPull && (
               <span
-                className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1"
+                className="px-2 py-0.5 text-xs rounded-full flex items-center gap-1"
+                style={{
+                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                  color: '#6ee7b7',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  boxShadow: '0 0 8px rgba(16, 185, 129, 0.3)'
+                }}
                 title={`${gitStatus!.behind} commits para descargar`}
               >
                 <Download className="w-3 h-3" />
@@ -207,7 +282,14 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
               </span>
             )}
             {!project.hasGit && (
-              <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded-full">
+              <span
+                className="px-2 py-0.5 text-xs rounded-full"
+                style={{
+                  backgroundColor: 'rgba(99, 163, 255, 0.1)',
+                  color: '#D1D5DB',
+                  border: '1px solid rgba(99, 163, 255, 0.2)'
+                }}
+              >
                 No Git
               </span>
             )}
@@ -220,8 +302,16 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
         {/* IDE */}
         <button
           onClick={handleOpenIDE}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-          style={{ color: colors.primary }}
+          className="p-2 rounded-xl transition-colors"
+          style={{ color: '#D1D5DB' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+            e.currentTarget.style.color = '#FFFFFF';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#D1D5DB';
+          }}
           title="Abrir en IDE"
         >
           <ExternalLink className="w-4 h-4" />
@@ -230,7 +320,16 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
         {/* Folder */}
         <button
           onClick={handleOpenExplorer}
-          className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          className="p-2 rounded-xl transition-colors"
+          style={{ color: '#D1D5DB' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+            e.currentTarget.style.color = '#FFFFFF';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#D1D5DB';
+          }}
           title="Abrir carpeta"
         >
           <FolderOpen className="w-4 h-4" />
@@ -240,12 +339,18 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
         {project.hasGit && (
           <button
             onClick={handlePull}
-            className={cn(
-              "p-2 rounded-lg transition-colors",
-              hasCommitsToPull
-                ? "text-green-400 hover:bg-green-500/20"
-                : "text-gray-400 hover:text-white hover:bg-white/10"
-            )}
+            className="p-2 rounded-xl transition-colors"
+            style={{
+              color: hasCommitsToPull ? '#10B981' : '#D1D5DB'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = hasCommitsToPull
+                ? 'rgba(16, 185, 129, 0.2)'
+                : 'rgba(59, 130, 246, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
             title="Git Pull"
           >
             <Download className="w-4 h-4" />
@@ -256,7 +361,16 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
         <div className="relative">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 rounded-xl transition-colors"
+            style={{ color: '#D1D5DB' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+              e.currentTarget.style.color = '#FFFFFF';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#D1D5DB';
+            }}
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -265,8 +379,12 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="absolute right-0 top-10 w-44 bg-dark-800 border border-white/10
-                         rounded-lg shadow-xl overflow-hidden z-50"
+              className="absolute right-0 top-10 w-44 rounded-2xl shadow-xl overflow-hidden z-50"
+              style={{
+                background: 'rgba(15, 31, 55, 0.95)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(99, 163, 255, 0.3)'
+              }}
             >
               {project.hasGit && (
                 <>
@@ -278,8 +396,16 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
                         projectName: project.name,
                       });
                     }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-gray-300
-                               hover:bg-white/5 flex items-center gap-3"
+                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+                    style={{ color: '#D1D5DB' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.color = '#FFFFFF';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#D1D5DB';
+                    }}
                   >
                     <Settings className="w-4 h-4" />
                     Git Config
@@ -289,8 +415,16 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
                       setShowMenu(false);
                       loadGitStatus(true);
                     }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-gray-300
-                               hover:bg-white/5 flex items-center gap-3"
+                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+                    style={{ color: '#D1D5DB' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.color = '#FFFFFF';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#D1D5DB';
+                    }}
                   >
                     <RefreshCw className="w-4 h-4" />
                     Actualizar
@@ -306,8 +440,16 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
                       currentNote: favoriteNote,
                     });
                   }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-gray-300
-                             hover:bg-white/5 flex items-center gap-3"
+                  className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
+                  style={{ color: '#D1D5DB' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                    e.currentTarget.style.color = '#FFFFFF';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#D1D5DB';
+                  }}
                 >
                   <MessageSquare className="w-4 h-4" />
                   Editar Nota

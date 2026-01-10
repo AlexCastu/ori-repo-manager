@@ -113,24 +113,28 @@ export function SettingsModal() {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-md bg-dark-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+          className="relative w-full max-w-md glass-modal overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-white/10">
+          <div className="flex items-center justify-between p-5"
+               style={{ borderBottom: '1px solid rgba(99, 163, 255, 0.15)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="p-2 rounded-xl"
-                style={{ backgroundColor: `${colors.primary}20` }}
+                style={{ background: 'rgba(59, 130, 246, 0.2)' }}
               >
-                <Settings className="w-5 h-5" style={{ color: colors.primary }} />
+                <Settings className="w-5 h-5" style={{ color: '#3B82F6' }} />
               </div>
               <h2 className="text-lg font-bold text-white">Configuración</h2>
             </div>
             <button
               onClick={closeSettingsModal}
-              className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              className="p-2 rounded-xl transition-colors"
+              style={{ color: '#D1D5DB' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -138,47 +142,43 @@ export function SettingsModal() {
           <div className="p-5 space-y-6 max-h-[60vh] overflow-y-auto">
             {/* Git Global Config Section */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                <GitBranch className="w-4 h-4" style={{ color: colors.primary }} />
+              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: '#D1D5DB' }}>
+                <GitBranch className="w-4 h-4" style={{ color: '#3B82F6' }} />
                 Configuración Git Global
               </div>
 
               {isLoadingGit ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#3B82F6' }} />
                 </div>
               ) : (
                 <div className="space-y-3">
                   {/* Git Name */}
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1.5">user.name</label>
+                    <label className="block text-xs mb-1.5" style={{ color: '#9ca3af' }}>user.name</label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
                       <input
                         type="text"
                         value={gitName}
                         onChange={(e) => setGitName(e.target.value)}
                         placeholder="Tu nombre"
-                        className="w-full px-4 py-2 pl-10 bg-dark-800 border border-white/10 rounded-lg
-                                   text-sm text-gray-100 placeholder:text-gray-500
-                                   focus:outline-none focus:border-white/20 transition-all"
+                        className="input-base pl-10 text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Git Email */}
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1.5">user.email</label>
+                    <label className="block text-xs mb-1.5" style={{ color: '#9ca3af' }}>user.email</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
                       <input
                         type="email"
                         value={gitEmail}
                         onChange={(e) => setGitEmail(e.target.value)}
                         placeholder="tu@email.com"
-                        className="w-full px-4 py-2 pl-10 bg-dark-800 border border-white/10 rounded-lg
-                                   text-sm text-gray-100 placeholder:text-gray-500
-                                   focus:outline-none focus:border-white/20 transition-all"
+                        className="input-base pl-10 text-sm"
                       />
                     </div>
                   </div>
@@ -188,8 +188,9 @@ export function SettingsModal() {
                     disabled={isSavingGit}
                     className="w-full py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2"
                     style={{
-                      backgroundColor: `${colors.primary}20`,
-                      color: colors.primary
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      color: '#3B82F6',
+                      border: '1px solid rgba(59, 130, 246, 0.3)'
                     }}
                   >
                     {isSavingGit ? (
@@ -203,29 +204,26 @@ export function SettingsModal() {
               )}
             </div>
 
-            <div className="border-t border-white/5" />
+            <div style={{ borderTop: '1px solid rgba(99, 163, 255, 0.1)' }} />
 
             {/* App Settings */}
             <div className="space-y-4">
-              <div className="text-sm font-medium text-gray-300">Preferencias</div>
+              <div className="text-sm font-medium" style={{ color: '#D1D5DB' }}>Preferencias</div>
 
               {/* Show Favorites First */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Star className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm text-gray-300">Mostrar favoritos primero</span>
+                  <Star className="w-4 h-4" style={{ color: '#fcd34d' }} />
+                  <span className="text-sm" style={{ color: '#D1D5DB' }}>Mostrar favoritos primero</span>
                 </div>
                 <button
                   onClick={() => setSettings({ ...settings, showFavoritesFirst: !settings.showFavoritesFirst })}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${
-                    settings.showFavoritesFirst ? '' : 'bg-gray-600'
-                  }`}
-                  style={{ backgroundColor: settings.showFavoritesFirst ? colors.primary : undefined }}
+                  className="relative w-11 h-6 rounded-full transition-colors"
+                  style={{ backgroundColor: settings.showFavoritesFirst ? '#3B82F6' : '#4b5563' }}
                 >
                   <span
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      settings.showFavoritesFirst ? 'left-6' : 'left-1'
-                    }`}
+                    className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                    style={{ left: settings.showFavoritesFirst ? '1.5rem' : '0.25rem' }}
                   />
                 </button>
               </div>
@@ -233,46 +231,43 @@ export function SettingsModal() {
               {/* Auto Scan on Start */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <RefreshCw className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm text-gray-300">Escaneo automático al iniciar</span>
+                  <RefreshCw className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                  <span className="text-sm" style={{ color: '#D1D5DB' }}>Escaneo automático al iniciar</span>
                 </div>
                 <button
                   onClick={() => setSettings({ ...settings, autoScanOnStart: !settings.autoScanOnStart })}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${
-                    settings.autoScanOnStart ? '' : 'bg-gray-600'
-                  }`}
-                  style={{ backgroundColor: settings.autoScanOnStart ? colors.primary : undefined }}
+                  className="relative w-11 h-6 rounded-full transition-colors"
+                  style={{ backgroundColor: settings.autoScanOnStart ? '#3B82F6' : '#4b5563' }}
                 >
                   <span
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      settings.autoScanOnStart ? 'left-6' : 'left-1'
-                    }`}
+                    className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                    style={{ left: settings.autoScanOnStart ? '1.5rem' : '0.25rem' }}
                   />
                 </button>
               </div>
             </div>
 
             {/* Version Info */}
-            <div className="pt-4 border-t border-white/10">
-              <p className="text-xs text-gray-500 text-center">
+            <div className="pt-4" style={{ borderTop: '1px solid rgba(99, 163, 255, 0.15)' }}>
+              <p className="text-xs text-center" style={{ color: '#9ca3af' }}>
                 ORI-RepoManager v{config?.version || '2.0.0'}
               </p>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 p-5 border-t border-white/10">
+          <div className="flex justify-end gap-3 p-5"
+               style={{ borderTop: '1px solid rgba(99, 163, 255, 0.15)' }}>
             <button
               onClick={closeSettingsModal}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              className="btn-secondary text-sm"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-2 px-5 py-2 text-white text-sm font-medium rounded-lg transition-all"
-              style={{ backgroundColor: colors.primary }}
+              className="btn-primary flex items-center gap-2 text-sm"
             >
               {isSaving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

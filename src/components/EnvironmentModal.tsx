@@ -140,11 +140,11 @@ export function EnvironmentModal() {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg max-h-[90vh] bg-dark-900 border border-white/10
-                       rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            className="relative w-full max-w-lg max-h-[90vh] glass-modal flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-white/5 flex-shrink-0">
+            <div className="flex items-center justify-between p-6 flex-shrink-0"
+                 style={{ borderBottom: '1px solid rgba(99, 163, 255, 0.15)' }}>
               <h2 className="text-xl font-bold text-white">
                 {isEditMode ? 'Editar Entorno' : 'Nuevo Entorno'}
               </h2>
@@ -160,11 +160,11 @@ export function EnvironmentModal() {
             <form id="environment-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
                   Nombre del Entorno
                 </label>
                 <div className="relative">
-                  <Folder className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <Folder className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
                   <input
                     type="text"
                     value={name}
@@ -178,12 +178,12 @@ export function EnvironmentModal() {
 
               {/* Base Path */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
                   Ruta Base
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <FolderOpen className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <FolderOpen className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
                     <input
                       type="text"
                       value={basePath}
@@ -200,18 +200,18 @@ export function EnvironmentModal() {
                     Explorar
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1.5">
+                <p className="text-xs mt-1.5" style={{ color: '#9ca3af' }}>
                   Carpeta donde están los proyectos de este entorno
                 </p>
               </div>
 
               {/* Git Server */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
                   Servidor Git (opcional)
                 </label>
                 <div className="relative">
-                  <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
                   <input
                     type="text"
                     value={gitServer}
@@ -220,32 +220,40 @@ export function EnvironmentModal() {
                     className="input-base pl-11"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1.5">
+                <p className="text-xs mt-1.5" style={{ color: '#9ca3af' }}>
                   URL del servidor Git para clonar nuevos proyectos
                 </p>
               </div>
 
               {/* Color Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
                   <div className="flex items-center gap-2">
                     <Palette className="w-4 h-4" />
                     Color del Entorno
                   </div>
                 </label>
-                <div className="grid grid-cols-7 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {availableColors.map((color) => {
                     const colorData = environmentColors[color];
+                    const isGradient = colorData.gradient.startsWith('linear-gradient');
                     return (
                       <button
                         key={color}
                         type="button"
                         onClick={() => setSelectedColor(color)}
-                        className={`w-8 h-8 rounded-lg transition-all duration-200
-                                   ${selectedColor === color
-                                     ? 'ring-2 ring-white ring-offset-2 ring-offset-dark-900 scale-110'
-                                     : 'hover:scale-110'}`}
-                        style={{ backgroundColor: colorData.primary }}
+                        className="w-8 h-8 rounded-lg transition-all duration-200"
+                        style={{
+                          ...(isGradient
+                            ? { background: colorData.gradient }
+                            : { backgroundColor: colorData.primary }),
+                          ...(selectedColor === color
+                            ? {
+                                boxShadow: '0 0 0 2px #0f1a2b, 0 0 0 4px #FFFFFF',
+                                transform: 'scale(1.1)'
+                              }
+                            : {})
+                        }}
                         title={color.charAt(0).toUpperCase() + color.slice(1)}
                       />
                     );
@@ -255,26 +263,36 @@ export function EnvironmentModal() {
 
               {/* Icon Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
                   Icono del Entorno
                 </label>
                 <div className="grid grid-cols-6 gap-2">
                   {availableIcons.map((iconName) => {
                     const IconComponent = iconComponents[iconName];
                     const colorData = environmentColors[selectedColor];
+                    const isGradient = colorData.gradient.startsWith('linear-gradient');
                     return (
                       <button
                         key={iconName}
                         type="button"
                         onClick={() => setSelectedIcon(iconName)}
-                        className={`p-2.5 rounded-lg transition-all duration-200 flex items-center justify-center
-                                   ${selectedIcon === iconName
-                                     ? 'ring-2 ring-offset-2 ring-offset-dark-900 scale-110'
-                                     : 'bg-dark-800 hover:bg-dark-700'}`}
-                        style={{
-                          backgroundColor: selectedIcon === iconName ? colorData.primary : undefined,
-                          color: selectedIcon === iconName ? 'white' : '#9ca3af'
-                        }}
+                        className="p-2.5 rounded-lg transition-all duration-200 flex items-center justify-center"
+                        style={
+                          selectedIcon === iconName
+                            ? {
+                                ...(isGradient
+                                  ? { background: colorData.gradient }
+                                  : { backgroundColor: colorData.primary }),
+                                color: 'white',
+                                boxShadow: '0 0 0 2px #0f1a2b, 0 0 0 4px rgba(99, 163, 255, 0.5)',
+                                transform: 'scale(1.1)'
+                              }
+                            : {
+                                backgroundColor: 'rgba(15, 31, 55, 0.8)',
+                                color: '#9ca3af',
+                                border: '1px solid rgba(99, 163, 255, 0.2)'
+                              }
+                        }
                         title={iconName}
                       >
                         <IconComponent className="w-5 h-5" />
@@ -285,12 +303,20 @@ export function EnvironmentModal() {
               </div>
 
               {/* Preview */}
-              <div className="p-4 bg-dark-800 rounded-xl border border-white/5">
-                <p className="text-xs text-gray-500 mb-2">Vista previa</p>
+              <div className="p-4 rounded-xl"
+                   style={{
+                     background: 'rgba(15, 31, 55, 0.8)',
+                     border: '1px solid rgba(99, 163, 255, 0.2)'
+                   }}>
+                <p className="text-xs mb-2" style={{ color: '#9ca3af' }}>Vista previa</p>
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: environmentColors[selectedColor].primary }}
+                    style={
+                      environmentColors[selectedColor].gradient.startsWith('linear-gradient')
+                        ? { background: environmentColors[selectedColor].gradient }
+                        : { backgroundColor: environmentColors[selectedColor].primary }
+                    }
                   >
                     {(() => {
                       const IconComponent = iconComponents[selectedIcon];
@@ -301,7 +327,7 @@ export function EnvironmentModal() {
                     <p className="font-medium text-white">
                       {name || 'Nombre del entorno'}
                     </p>
-                    <p className="text-xs text-gray-500 truncate max-w-[250px]">
+                    <p className="text-xs truncate max-w-[250px]" style={{ color: '#9ca3af' }}>
                       {basePath || 'Ruta base...'}
                     </p>
                   </div>
@@ -310,13 +336,19 @@ export function EnvironmentModal() {
             </form>
 
             {/* Actions - Footer outside scroll */}
-            <div className="flex items-center justify-between p-6 border-t border-white/5 flex-shrink-0 bg-dark-900">
+            <div className="flex items-center justify-between p-6 flex-shrink-0"
+                 style={{
+                   borderTop: '1px solid rgba(99, 163, 255, 0.15)',
+                   background: 'rgba(15, 31, 55, 0.5)'
+                 }}>
               {isEditMode ? (
                 <button
                   type="button"
                   onClick={handleOpenDeleteModal}
-                  className="text-red-400 hover:text-red-300 text-sm font-medium
-                             flex items-center gap-2 transition-colors"
+                  className="text-sm font-medium flex items-center gap-2 transition-colors"
+                  style={{ color: '#EF4444' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = '#fca5a5'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = '#EF4444'}
                 >
                   <Trash2 className="w-4 h-4" />
                   Eliminar entorno

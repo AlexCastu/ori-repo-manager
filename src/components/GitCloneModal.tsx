@@ -93,24 +93,29 @@ export function GitCloneModal() {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-lg glass-card rounded-2xl shadow-2xl overflow-hidden"
+          className="relative w-full max-w-lg glass-modal overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center justify-between p-6"
+               style={{ borderBottom: '1px solid rgba(99, 163, 255, 0.15)' }}>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/20 rounded-xl">
-                <GitBranch className="w-6 h-6 text-green-400" />
+              <div className="p-2 rounded-xl"
+                   style={{ background: 'rgba(16, 185, 129, 0.2)' }}>
+                <GitBranch className="w-6 h-6" style={{ color: '#10B981' }} />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Git Clone</h2>
-                <p className="text-sm text-gray-400">Clonar nuevo repositorio</p>
+                <p className="text-sm" style={{ color: '#D1D5DB' }}>Clonar nuevo repositorio</p>
               </div>
             </div>
             <button
               onClick={handleClose}
-              className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              className="p-2 rounded-xl transition-colors"
+              style={{ color: '#D1D5DB' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -118,15 +123,15 @@ export function GitCloneModal() {
           <div className="p-6 space-y-4">
             {/* Repository URL Input */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">URL del repositorio</label>
+              <label className="text-sm font-medium" style={{ color: '#D1D5DB' }}>URL del repositorio</label>
               <div className="relative">
-                <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#3B82F6' }} />
                 <input
                   type="text"
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
                   placeholder={`https://${data.gitServer}/usuario/repo.git`}
-                  className="w-full pl-10 pr-4 py-3 bg-black/30 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 focus:ring-2 focus:ring-green-500/20 transition-all"
+                  className="input-base pl-10"
                   disabled={status === 'cloning'}
                 />
               </div>
@@ -134,33 +139,56 @@ export function GitCloneModal() {
 
             {/* Destination Path */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Directorio de destino</label>
+              <label className="text-sm font-medium" style={{ color: '#D1D5DB' }}>Directorio de destino</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={customPath || data.basePath}
                   readOnly
-                  className="flex-1 px-4 py-3 bg-black/30 border border-white/10 rounded-xl text-gray-400 focus:outline-none font-mono text-sm"
+                  className="flex-1 px-4 py-3 rounded-xl font-mono text-sm"
+                  style={{
+                    background: 'rgba(15, 31, 55, 0.6)',
+                    border: '1px solid rgba(99, 163, 255, 0.2)',
+                    color: '#D1D5DB'
+                  }}
                 />
                 <button
                   onClick={handleSelectPath}
                   disabled={status === 'cloning'}
-                  className="px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-colors disabled:opacity-50"
+                  className="px-4 py-3 rounded-xl transition-colors disabled:opacity-50"
+                  style={{
+                    background: 'rgba(15, 31, 55, 0.6)',
+                    border: '1px solid rgba(99, 163, 255, 0.2)',
+                    color: '#D1D5DB'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(99, 163, 255, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(15, 31, 55, 0.6)';
+                    e.currentTarget.style.borderColor = 'rgba(99, 163, 255, 0.2)';
+                  }}
                 >
-                  <FolderOpen className="w-5 h-5 text-gray-300" />
+                  <FolderOpen className="w-5 h-5" />
                 </button>
               </div>
               {/* Environment Info Box */}
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <div className="p-3 rounded-lg"
+                   style={{
+                     background: 'rgba(59, 130, 246, 0.1)',
+                     border: '1px solid rgba(59, 130, 246, 0.2)'
+                   }}>
                 <div className="flex items-start gap-2">
-                  <FolderOpen className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <FolderOpen className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#3B82F6' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-blue-300">Ruta del entorno activo</p>
-                    <p className="text-xs text-blue-400/80 font-mono truncate mt-0.5" title={data.basePath}>
+                    <p className="text-xs font-medium" style={{ color: '#93c5fd' }}>Ruta del entorno activo</p>
+                    <p className="text-xs font-mono truncate mt-0.5" title={data.basePath}
+                       style={{ color: 'rgba(147, 197, 253, 0.8)' }}>
                       {data.basePath}
                     </p>
                     {data.gitServer && (
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
                         Servidor: {data.gitServer}
                       </p>
                     )}
@@ -171,9 +199,13 @@ export function GitCloneModal() {
 
             {/* Status Display */}
             {status !== 'idle' && (
-              <div className="bg-black/30 rounded-xl p-4 font-mono text-sm overflow-auto max-h-[200px]">
+              <div className="rounded-xl p-4 font-mono text-sm overflow-auto max-h-[200px]"
+                   style={{
+                     background: 'rgba(10, 20, 33, 0.8)',
+                     border: '1px solid rgba(99, 163, 255, 0.15)'
+                   }}>
                 {status === 'cloning' && (
-                  <div className="flex items-center gap-3 text-green-400">
+                  <div className="flex items-center gap-3" style={{ color: '#10B981' }}>
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span>Clonando repositorio...</span>
                   </div>
@@ -181,21 +213,21 @@ export function GitCloneModal() {
 
                 {status === 'success' && (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-green-400">
+                    <div className="flex items-center gap-2" style={{ color: '#10B981' }}>
                       <CheckCircle className="w-5 h-5" />
                       <span>Clone completado exitosamente</span>
                     </div>
-                    <pre className="text-gray-300 whitespace-pre-wrap">{output}</pre>
+                    <pre className="whitespace-pre-wrap" style={{ color: '#D1D5DB' }}>{output}</pre>
                   </div>
                 )}
 
                 {status === 'error' && (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-red-400">
+                    <div className="flex items-center gap-2" style={{ color: '#EF4444' }}>
                       <XCircle className="w-5 h-5" />
                       <span>Error durante el clone</span>
                     </div>
-                    <pre className="text-red-300 whitespace-pre-wrap">{error}</pre>
+                    <pre className="whitespace-pre-wrap" style={{ color: '#fca5a5' }}>{error}</pre>
                   </div>
                 )}
               </div>
@@ -203,17 +235,23 @@ export function GitCloneModal() {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 p-6 border-t border-white/10">
+          <div className="flex justify-end gap-3 p-6"
+               style={{ borderTop: '1px solid rgba(99, 163, 255, 0.15)' }}>
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+              className="btn-secondary"
             >
               Cerrar
             </button>
             <button
               onClick={handleClone}
               disabled={status === 'cloning' || !repoUrl}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-6 py-2 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(135deg, #10B981, #059669)',
+                color: 'white',
+                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+              }}
             >
               {status === 'cloning' ? (
                 <>

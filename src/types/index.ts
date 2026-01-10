@@ -2,19 +2,21 @@
 
 // Available theme colors for environments
 export type EnvironmentColor =
-  | 'emerald'   // Verde esmeralda
-  | 'teal'      // Verde azulado
-  | 'cyan'      // Cian
-  | 'sky'       // Azul cielo
-  | 'blue'      // Azul
-  | 'indigo'    // Índigo
-  | 'violet'    // Violeta
-  | 'purple'    // Púrpura
-  | 'fuchsia'   // Fucsia
-  | 'pink'      // Rosa
-  | 'rose'      // Rosa intenso
-  | 'amber'     // Ámbar
-  | 'orange';   // Naranja
+  | 'ocean'       // Océano profundo (azul-verde)
+  | 'forest'      // Bosque (verde profundo)
+  | 'sunset'      // Atardecer (amarillo-naranja-púrpura)
+  | 'arctic'      // Ártico (cyan-azul)
+  | 'violet'      // Violeta (púrpura-rosa)
+  | 'coral'       // Coral (rosa-salmón)
+  | 'emerald'     // Esmeralda (verde menta)
+  | 'electric'    // Eléctrico (azul intenso)
+  | 'silver'      // Plata (azul gris)
+  | 'aurora'      // Aurora (verde-púrpura)
+  | 'teal'        // Teal (cyan-verde)
+  | 'slate'       // Pizarra (gris oscuro)
+  | 'copper'      // Cobre (marrón cálido)
+  | 'navy'        // Marino (azul profundo)
+  | 'flame';      // Llama (naranja-rojo)
 
 // Available icons for environments
 export type EnvironmentIcon =

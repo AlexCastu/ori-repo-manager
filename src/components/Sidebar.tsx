@@ -73,19 +73,21 @@ export function Sidebar() {
     <motion.aside
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className="w-72 h-full bg-dark-900/40 backdrop-blur-xl border-r border-white/5
-                 flex flex-col overflow-hidden"
+      className="w-72 h-full glass-sidebar flex flex-col overflow-hidden"
     >
       {/* Header / Logo */}
-      <div className="p-6 border-b border-white/5">
+      <div className="p-6 border-b" style={{ borderColor: 'rgba(99, 163, 255, 0.15)' }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center
-                          shadow-glow-sm">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+               style={{
+                 background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)',
+                 boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
+               }}>
             <GitBranch className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-white">ORI-RepoManager</h1>
-            <p className="text-xs text-gray-500">v2.0 • Alex C.C.</p>
+            <p className="text-xs" style={{ color: '#D1D5DB' }}>v2.0 • Alex C.C.</p>
           </div>
         </div>
       </div>
@@ -105,17 +107,18 @@ export function Sidebar() {
 
       {/* Environments List */}
       <div className="flex-1 overflow-y-auto px-3 py-2">
-        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider px-3 mb-2">
+        <div className="text-xs font-medium uppercase tracking-wider px-3 mb-2"
+             style={{ color: '#D1D5DB' }}>
           Entornos
         </div>
 
         {environments.length === 0 ? (
           <div className="px-3 py-8 text-center">
-            <Folder className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">
+            <Folder className="w-10 h-10 mx-auto mb-3" style={{ color: '#3B82F6' }} />
+            <p className="text-sm text-white">
               No hay entornos configurados
             </p>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs mt-1" style={{ color: '#D1D5DB' }}>
               Crea uno para empezar
             </p>
           </div>
@@ -143,21 +146,23 @@ export function Sidebar() {
                     const IconComponent = iconComponents[iconName];
                     const colorData = environmentColors[colorName];
                     const isActive = activeEnvironment?.id === env.id;
+                    const isGradient = colorData.gradient.startsWith('linear-gradient');
 
                     return (
                       <div
                         className={cn(
-                          'w-7 h-7 rounded-lg flex items-center justify-center transition-all',
-                          isActive ? '' : 'bg-dark-800'
+                          'w-7 h-7 rounded-xl flex items-center justify-center transition-all',
+                          isActive ? '' : 'bg-white/10'
                         )}
-                        style={{
-                          backgroundColor: isActive ? colorData.primary : undefined
-                        }}
+                        style={
+                          isActive
+                            ? isGradient
+                              ? { background: colorData.gradient }
+                              : { backgroundColor: colorData.primary }
+                            : undefined
+                        }
                       >
-                        <IconComponent className={cn(
-                          'w-4 h-4',
-                          isActive ? 'text-white' : 'text-gray-500'
-                        )} />
+                        <IconComponent className="w-4 h-4 text-white" />
                       </div>
                     );
                   })()}
@@ -165,9 +170,9 @@ export function Sidebar() {
                   <ChevronRight className={cn(
                     'w-4 h-4 transition-all',
                     activeEnvironment?.id === env.id
-                      ? 'text-primary-400 rotate-90'
-                      : 'text-gray-600 opacity-0 group-hover:opacity-100'
-                  )} />
+                      ? 'rotate-90 text-white'
+                      : 'opacity-0 group-hover:opacity-100'
+                  )} style={{ color: activeEnvironment?.id !== env.id ? '#D1D5DB' : undefined }} />
                 </button>
 
                 {/* Environment Actions - show on active */}
@@ -225,8 +230,13 @@ export function Sidebar() {
                           basePath: env.basePath,
                         });
                       }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-green-400
-                                 hover:bg-green-500/10 rounded-lg transition-colors"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors"
+                      style={{
+                        color: '#10B981',
+                        backgroundColor: 'transparent'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.15)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       <GitPullRequest className="w-3.5 h-3.5" />
                       <span>Clonar Repositorio</span>
@@ -240,7 +250,7 @@ export function Sidebar() {
       </div>
 
       {/* Footer / Settings */}
-      <div className="p-4 border-t border-white/5 space-y-1">
+      <div className="p-4 space-y-1" style={{ borderTop: '1px solid rgba(99, 163, 255, 0.15)' }}>
         <button
           onClick={() => openGitVariablesModal()}
           className="sidebar-item w-full"

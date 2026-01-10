@@ -25,14 +25,14 @@ function App() {
 
   if (!isInitialized) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-dark-950 gradient-mesh">
+      <div className="h-screen w-screen flex items-center justify-center gradient-mesh relative">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center"
         >
-          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center
-                          shadow-glow-lg mx-auto mb-4 animate-pulse-slow">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse-slow"
+               style={{ background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)' }}>
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -46,14 +46,17 @@ function App() {
 
   return (
     <ThemeProvider>
-      <div className="h-screen w-screen flex overflow-hidden bg-dark-950 gradient-mesh">
-        {/* Sidebar */}
-        <Sidebar />
+      <div className="h-screen w-screen flex flex-col overflow-hidden gradient-mesh relative">
+        {/* Main content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar */}
+          <Sidebar />
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          <ProjectGrid />
-        </main>
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col overflow-hidden">
+            <ProjectGrid />
+          </main>
+        </div>
 
         {/* Modals */}
         <EnvironmentModal />

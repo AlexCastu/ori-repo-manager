@@ -50,10 +50,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     // Generate background colors with transparency from theme color
     const primaryRgb = hexToRgb(colors.primary);
     if (primaryRgb) {
-      // Background gradient mesh with theme color
-      root.style.setProperty('--theme-bg-glow-1', `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.12)`);
-      root.style.setProperty('--theme-bg-glow-2', `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.08)`);
-      root.style.setProperty('--theme-bg-glow-3', `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.06)`);
+      // Background gradient mesh with theme color - very vibrant
+      root.style.setProperty('--theme-bg-glow-1', `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.50)`);
+      root.style.setProperty('--theme-bg-glow-2', `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.35)`);
+      root.style.setProperty('--theme-bg-glow-3', `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.25)`);
     }
 
     // Also update meta theme color for mobile browsers

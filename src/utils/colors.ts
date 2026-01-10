@@ -11,143 +11,178 @@ export const environmentColors: Record<EnvironmentColor, {
   border: string;
   text: string;
 }> = {
-  emerald: {
-    primary: '#10b981',
-    secondary: '#34d399',
-    gradient: 'from-emerald-500 to-emerald-600',
-    accent: 'bg-emerald-500',
-    bg: 'bg-emerald-500/10',
-    bgHover: 'hover:bg-emerald-500/20',
-    border: 'border-emerald-500/30',
-    text: 'text-emerald-400',
+  // Océano profundo (azul-verde original)
+  ocean: {
+    primary: '#184664',
+    secondary: '#4eb490',
+    gradient: 'linear-gradient(135deg, #000032 0%, #184664 50%, #4eb490 100%)',
+    accent: 'bg-[#184664]',
+    bg: 'bg-[#184664]/10',
+    bgHover: 'hover:bg-[#184664]/20',
+    border: 'border-[#184664]/30',
+    text: 'text-[#4eb490]',
   },
-  teal: {
-    primary: '#14b8a6',
-    secondary: '#2dd4bf',
-    gradient: 'from-teal-500 to-teal-600',
-    accent: 'bg-teal-500',
-    bg: 'bg-teal-500/10',
-    bgHover: 'hover:bg-teal-500/20',
-    border: 'border-teal-500/30',
-    text: 'text-teal-400',
+  // Bosque (verde profundo)
+  forest: {
+    primary: '#196a4c',
+    secondary: '#39b943',
+    gradient: 'linear-gradient(135deg, #39b943 0%, #389c4f 20%, #2b8252 40%, #196a4c 60%, #08543d 80%, #02422d 100%)',
+    accent: 'bg-[#196a4c]',
+    bg: 'bg-[#196a4c]/10',
+    bgHover: 'hover:bg-[#196a4c]/20',
+    border: 'border-[#196a4c]/30',
+    text: 'text-[#39b943]',
   },
-  cyan: {
-    primary: '#06b6d4',
-    secondary: '#22d3ee',
-    gradient: 'from-cyan-500 to-cyan-600',
-    accent: 'bg-cyan-500',
-    bg: 'bg-cyan-500/10',
-    bgHover: 'hover:bg-cyan-500/20',
-    border: 'border-cyan-500/30',
-    text: 'text-cyan-400',
+  // Atardecer (amarillo-naranja-púrpura)
+  sunset: {
+    primary: '#ff952f',
+    secondary: '#dcca5b',
+    gradient: 'linear-gradient(135deg, #dcca5b 0%, #feb639 20%, #ff952f 40%, #f46e4b 60%, #ca4869 80%, #872863 100%)',
+    accent: 'bg-[#ff952f]',
+    bg: 'bg-[#ff952f]/10',
+    bgHover: 'hover:bg-[#ff952f]/20',
+    border: 'border-[#ff952f]/30',
+    text: 'text-[#dcca5b]',
   },
-  sky: {
-    primary: '#0ea5e9',
-    secondary: '#38bdf8',
-    gradient: 'from-sky-500 to-sky-600',
-    accent: 'bg-sky-500',
-    bg: 'bg-sky-500/10',
-    bgHover: 'hover:bg-sky-500/20',
-    border: 'border-sky-500/30',
-    text: 'text-sky-400',
+  // Ártico (cyan-azul vibrante)
+  arctic: {
+    primary: '#48c6ef',
+    secondary: '#6f86d6',
+    gradient: 'linear-gradient(to top, #48c6ef 0%, #6f86d6 100%)',
+    accent: 'bg-[#48c6ef]',
+    bg: 'bg-[#48c6ef]/10',
+    bgHover: 'hover:bg-[#48c6ef]/20',
+    border: 'border-[#48c6ef]/30',
+    text: 'text-[#6f86d6]',
   },
-  blue: {
-    primary: '#3b82f6',
-    secondary: '#60a5fa',
-    gradient: 'from-blue-500 to-blue-600',
-    accent: 'bg-blue-500',
-    bg: 'bg-blue-500/10',
-    bgHover: 'hover:bg-blue-500/20',
-    border: 'border-blue-500/30',
-    text: 'text-blue-400',
-  },
-  indigo: {
-    primary: '#6366f1',
-    secondary: '#818cf8',
-    gradient: 'from-indigo-500 to-indigo-600',
-    accent: 'bg-indigo-500',
-    bg: 'bg-indigo-500/10',
-    bgHover: 'hover:bg-indigo-500/20',
-    border: 'border-indigo-500/30',
-    text: 'text-indigo-400',
-  },
+  // Violeta (púrpura-rosa)
   violet: {
-    primary: '#8b5cf6',
-    secondary: '#a78bfa',
-    gradient: 'from-violet-500 to-violet-600',
-    accent: 'bg-violet-500',
-    bg: 'bg-violet-500/10',
-    bgHover: 'hover:bg-violet-500/20',
-    border: 'border-violet-500/30',
-    text: 'text-violet-400',
+    primary: '#c471f5',
+    secondary: '#fa71cd',
+    gradient: 'linear-gradient(to top, #c471f5 0%, #fa71cd 100%)',
+    accent: 'bg-[#c471f5]',
+    bg: 'bg-[#c471f5]/10',
+    bgHover: 'hover:bg-[#c471f5]/20',
+    border: 'border-[#c471f5]/30',
+    text: 'text-[#fa71cd]',
   },
-  purple: {
-    primary: '#a855f7',
-    secondary: '#c084fc',
-    gradient: 'from-purple-500 to-purple-600',
-    accent: 'bg-purple-500',
-    bg: 'bg-purple-500/10',
-    bgHover: 'hover:bg-purple-500/20',
-    border: 'border-purple-500/30',
-    text: 'text-purple-400',
+  // Coral (rosa-salmón cálido)
+  coral: {
+    primary: '#f9748f',
+    secondary: '#fe9a8b',
+    gradient: 'linear-gradient(to right, #f78ca0 0%, #f9748f 19%, #fd868c 60%, #fe9a8b 100%)',
+    accent: 'bg-[#f9748f]',
+    bg: 'bg-[#f9748f]/10',
+    bgHover: 'hover:bg-[#f9748f]/20',
+    border: 'border-[#f9748f]/30',
+    text: 'text-[#fe9a8b]',
   },
-  fuchsia: {
-    primary: '#d946ef',
-    secondary: '#e879f9',
-    gradient: 'from-fuchsia-500 to-fuchsia-600',
-    accent: 'bg-fuchsia-500',
-    bg: 'bg-fuchsia-500/10',
-    bgHover: 'hover:bg-fuchsia-500/20',
-    border: 'border-fuchsia-500/30',
-    text: 'text-fuchsia-400',
+  // Esmeralda (verde menta fresco)
+  emerald: {
+    primary: '#0ba360',
+    secondary: '#3cba92',
+    gradient: 'linear-gradient(to top, #0ba360 0%, #3cba92 100%)',
+    accent: 'bg-[#0ba360]',
+    bg: 'bg-[#0ba360]/10',
+    bgHover: 'hover:bg-[#0ba360]/20',
+    border: 'border-[#0ba360]/30',
+    text: 'text-[#3cba92]',
   },
-  pink: {
-    primary: '#ec4899',
-    secondary: '#f472b6',
-    gradient: 'from-pink-500 to-pink-600',
-    accent: 'bg-pink-500',
-    bg: 'bg-pink-500/10',
-    bgHover: 'hover:bg-pink-500/20',
-    border: 'border-pink-500/30',
-    text: 'text-pink-400',
+  // Eléctrico (azul intenso)
+  electric: {
+    primary: '#005bea',
+    secondary: '#00c6fb',
+    gradient: 'linear-gradient(to top, #00c6fb 0%, #005bea 100%)',
+    accent: 'bg-[#005bea]',
+    bg: 'bg-[#005bea]/10',
+    bgHover: 'hover:bg-[#005bea]/20',
+    border: 'border-[#005bea]/30',
+    text: 'text-[#00c6fb]',
   },
-  rose: {
-    primary: '#f43f5e',
-    secondary: '#fb7185',
-    gradient: 'from-rose-500 to-rose-600',
-    accent: 'bg-rose-500',
-    bg: 'bg-rose-500/10',
-    bgHover: 'hover:bg-rose-500/20',
-    border: 'border-rose-500/30',
-    text: 'text-rose-400',
+  // Plata (azul gris elegante)
+  silver: {
+    primary: '#6a85b6',
+    secondary: '#bac8e0',
+    gradient: 'linear-gradient(to top, #6a85b6 0%, #bac8e0 100%)',
+    accent: 'bg-[#6a85b6]',
+    bg: 'bg-[#6a85b6]/10',
+    bgHover: 'hover:bg-[#6a85b6]/20',
+    border: 'border-[#6a85b6]/30',
+    text: 'text-[#bac8e0]',
   },
-  amber: {
-    primary: '#f59e0b',
-    secondary: '#fbbf24',
-    gradient: 'from-amber-500 to-amber-600',
-    accent: 'bg-amber-500',
-    bg: 'bg-amber-500/10',
-    bgHover: 'hover:bg-amber-500/20',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400',
+  // Aurora (verde-púrpura mágico)
+  aurora: {
+    primary: '#6e45e2',
+    secondary: '#88d3ce',
+    gradient: 'linear-gradient(to top, #88d3ce 0%, #6e45e2 100%)',
+    accent: 'bg-[#6e45e2]',
+    bg: 'bg-[#6e45e2]/10',
+    bgHover: 'hover:bg-[#6e45e2]/20',
+    border: 'border-[#6e45e2]/30',
+    text: 'text-[#88d3ce]',
   },
-  orange: {
-    primary: '#f97316',
-    secondary: '#fb923c',
-    gradient: 'from-orange-500 to-orange-600',
-    accent: 'bg-orange-500',
-    bg: 'bg-orange-500/10',
-    bgHover: 'hover:bg-orange-500/20',
-    border: 'border-orange-500/30',
-    text: 'text-orange-400',
+  // Teal (cyan-verde profundo)
+  teal: {
+    primary: '#13547a',
+    secondary: '#80d0c7',
+    gradient: 'linear-gradient(15deg, #13547a 0%, #80d0c7 100%)',
+    accent: 'bg-[#13547a]',
+    bg: 'bg-[#13547a]/10',
+    bgHover: 'hover:bg-[#13547a]/20',
+    border: 'border-[#13547a]/30',
+    text: 'text-[#80d0c7]',
+  },
+  // Pizarra (gris oscuro profesional)
+  slate: {
+    primary: '#596164',
+    secondary: '#868f96',
+    gradient: 'linear-gradient(to right, #868f96 0%, #596164 100%)',
+    accent: 'bg-[#596164]',
+    bg: 'bg-[#596164]/10',
+    bgHover: 'hover:bg-[#596164]/20',
+    border: 'border-[#596164]/30',
+    text: 'text-[#868f96]',
+  },
+  // Cobre (marrón cálido)
+  copper: {
+    primary: '#c79081',
+    secondary: '#dfa579',
+    gradient: 'linear-gradient(to top, #c79081 0%, #dfa579 100%)',
+    accent: 'bg-[#c79081]',
+    bg: 'bg-[#c79081]/10',
+    bgHover: 'hover:bg-[#c79081]/20',
+    border: 'border-[#c79081]/30',
+    text: 'text-[#dfa579]',
+  },
+  // Marino (azul profundo clásico)
+  navy: {
+    primary: '#1e3c72',
+    secondary: '#2a5298',
+    gradient: 'linear-gradient(to top, #1e3c72 0%, #1e3c72 1%, #2a5298 100%)',
+    accent: 'bg-[#1e3c72]',
+    bg: 'bg-[#1e3c72]/10',
+    bgHover: 'hover:bg-[#1e3c72]/20',
+    border: 'border-[#1e3c72]/30',
+    text: 'text-[#2a5298]',
+  },
+  // Llama (naranja-rojo vibrante)
+  flame: {
+    primary: '#fc6076',
+    secondary: '#ff9a44',
+    gradient: 'linear-gradient(-20deg, #fc6076 0%, #ff9a44 100%)',
+    accent: 'bg-[#fc6076]',
+    bg: 'bg-[#fc6076]/10',
+    bgHover: 'hover:bg-[#fc6076]/20',
+    border: 'border-[#fc6076]/30',
+    text: 'text-[#ff9a44]',
   },
 };
 
 // Available colors as array for selection
 export const availableColors: EnvironmentColor[] = [
-  'emerald', 'teal', 'cyan', 'sky', 'blue',
-  'indigo', 'violet', 'purple', 'fuchsia',
-  'pink', 'rose', 'amber', 'orange'
+  'ocean', 'forest', 'sunset', 'arctic', 'violet', 'coral',
+  'emerald', 'electric', 'silver', 'aurora', 'teal', 'slate',
+  'copper', 'navy', 'flame'
 ];
 
 // Available icons as array for selection
@@ -157,12 +192,12 @@ export const availableIcons: EnvironmentIcon[] = [
 ];
 
 // Default color and icon for new environments
-export const defaultEnvironmentColor: EnvironmentColor = 'emerald';
+export const defaultEnvironmentColor: EnvironmentColor = 'ocean';
 export const defaultEnvironmentIcon: EnvironmentIcon = 'folder';
 
 // Get color styles for an environment
-export function getEnvironmentColorStyles(color: EnvironmentColor = 'emerald') {
-  return environmentColors[color] || environmentColors.emerald;
+export function getEnvironmentColorStyles(color: EnvironmentColor = 'ocean') {
+  return environmentColors[color] || environmentColors.ocean;
 }
 
 // Generate CSS variables for dynamic theming
