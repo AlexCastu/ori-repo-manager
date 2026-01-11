@@ -194,17 +194,3 @@ export const availableIcons: EnvironmentIcon[] = [
 // Default color and icon for new environments
 export const defaultEnvironmentColor: EnvironmentColor = 'ocean';
 export const defaultEnvironmentIcon: EnvironmentIcon = 'folder';
-
-// Get color styles for an environment
-export function getEnvironmentColorStyles(color: EnvironmentColor = 'ocean') {
-  return environmentColors[color] || environmentColors.ocean;
-}
-
-// Generate CSS variables for dynamic theming
-export function generateThemeVariables(color: EnvironmentColor): Record<string, string> {
-  const colors = environmentColors[color];
-  return {
-    '--theme-primary': colors.primary,
-    '--theme-secondary': colors.secondary,
-  };
-}

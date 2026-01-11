@@ -44,9 +44,6 @@ export async function openInIDE(projectPath: string, ideCommand: string = 'code'
   return invoke<void>('open_in_ide', { projectPath, ideCommand });
 }
 
-// Alias para compatibilidad
-export const openInVscode = (projectPath: string) => openInIDE(projectPath, 'code');
-
 export async function openInExplorer(projectPath: string): Promise<void> {
   return invoke<void>('open_in_explorer', { projectPath });
 }
@@ -57,20 +54,6 @@ export async function selectDirectory(): Promise<string | null> {
 
 export async function checkPathExists(path: string): Promise<boolean> {
   return invoke<boolean>('check_path_exists', { path });
-}
-
-// Git global config types and functions
-export interface GitGlobalConfig {
-  name: string;
-  email: string;
-}
-
-export async function getGitGlobalConfig(): Promise<GitGlobalConfig> {
-  return invoke<GitGlobalConfig>('get_git_global_config');
-}
-
-export async function setGitGlobalConfig(name: string, email: string): Promise<void> {
-  return invoke<void>('set_git_global_config', { name, email });
 }
 
 // Git config variable types and functions

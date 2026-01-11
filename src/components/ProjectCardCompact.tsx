@@ -18,7 +18,7 @@ import type { Project, GitStatus } from '../types';
 import { useStore } from '../store/useStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../utils/helpers';
-import { openInIDE, openInExplorer, getGitStatus, gitFetch } from '../utils/tauri';
+import { openInIDE, openInExplorer, getGitStatus } from '../utils/tauri';
 import { PlatformIcon } from './PlatformIcon';
 import { IdeIcon, getIdeLabel } from './IdeIcon';
 
@@ -84,26 +84,6 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
       isMounted = false;
     };
   }, [project.path, project.hasGit, refreshTrigger]);
-
-  const loadGitStatus = async (withFetch: boolean = false) => {
-    if (!project.hasGit) return;
-    setIsLoadingStatus(true);
-    try {
-      if (withFetch) {
-        try {
-          await gitFetch(project.path);
-        } catch {
-          // Ignore fetch errors
-        }
-      }
-      const status = await getGitStatus(project.path);
-      setGitStatus(status);
-    } catch (error) {
-      console.error('Failed to get git status:', error);
-    } finally {
-      setIsLoadingStatus(false);
-    }
-  };
 
   const handleOpenIDE = async () => {
     try {

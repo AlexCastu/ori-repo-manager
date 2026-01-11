@@ -352,56 +352,6 @@ async fn get_config_file_path() -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-// Get global git configuration (user.name and user.email)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitGlobalConfig {
-    pub name: String,
-    pub email: String,
-}
-
-#[tauri::command]
-async fn get_git_global_config() -> Result<GitGlobalConfig, String> {
-    let mut name_cmd = Command::new("git");
-    name_cmd.args(["config", "--global", "user.name"]);
-    apply_no_window(&mut name_cmd);
-
-    let name_output = name_cmd.output()
-        .map_err(|e| format!("Failed to get git user.name: {}", e))?;
-
-    let name = String::from_utf8_lossy(&name_output.stdout).trim().to_string();
-
-    let mut email_cmd = Command::new("git");
-    email_cmd.args(["config", "--global", "user.email"]);
-    apply_no_window(&mut email_cmd);
-
-    let email_output = email_cmd.output()
-        .map_err(|e| format!("Failed to get git user.email: {}", e))?;
-
-    let email = String::from_utf8_lossy(&email_output.stdout).trim().to_string();
-
-    Ok(GitGlobalConfig { name, email })
-}
-
-// Set global git configuration
-#[tauri::command]
-async fn set_git_global_config(name: String, email: String) -> Result<(), String> {
-    let mut name_cmd = Command::new("git");
-    name_cmd.args(["config", "--global", "user.name", &name]);
-    apply_no_window(&mut name_cmd);
-
-    name_cmd.output()
-        .map_err(|e| format!("Failed to set git user.name: {}", e))?;
-
-    let mut email_cmd = Command::new("git");
-    email_cmd.args(["config", "--global", "user.email", &email]);
-    apply_no_window(&mut email_cmd);
-
-    email_cmd.output()
-        .map_err(|e| format!("Failed to set git user.email: {}", e))?;
-
-    Ok(())
-}
-
 // ==================== GIT CONFIG VARIABLES MANAGEMENT ====================
 
 // Get a single git config value by key
@@ -744,12 +694,6 @@ async fn open_in_ide(project_path: String, ide_command: String) -> Result<(), St
     Ok(())
 }
 
-// Backward compatibility alias
-#[tauri::command]
-async fn open_in_vscode(project_path: String) -> Result<(), String> {
-    open_in_ide(project_path, "code".to_string()).await
-}
-
 #[tauri::command]
 async fn open_in_explorer(project_path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -921,8 +865,6 @@ pub fn run() {
             git_config,
             git_fetch,
             get_git_status,
-            get_git_global_config,
-            set_git_global_config,
             get_git_config_value,
             set_git_config_value,
             unset_git_config_value,
@@ -933,22 +875,10 @@ pub fn run() {
             save_config,
             get_config_file_path,
             open_in_ide,
-            open_in_vscode,
             open_in_explorer,
             select_directory,
             check_path_exists,
-            // Advanced Git Commands
-            get_branches,
-            checkout_branch,
-            create_branch,
-            delete_branch,
-            get_commits,
-            get_stash_list,
-            stash_save,
-            stash_pop,
-            stash_drop,
-            get_file_changes,
-            get_diff,
+            // Batch Git Operations
             batch_git_fetch,
             batch_git_pull,
         ])
