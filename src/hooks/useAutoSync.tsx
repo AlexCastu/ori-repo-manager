@@ -9,9 +9,9 @@ export function useAutoSync() {
   useEffect(() => {
     if (!autoSyncConfig.enabled) return;
     if (!activeEnvironment) return;
-    
+
     // Skip if environment is not in auto-sync list
-    if (autoSyncConfig.environments.length > 0 && 
+    if (autoSyncConfig.environments.length > 0 &&
         !autoSyncConfig.environments.includes(activeEnvironment.id)) {
       return;
     }

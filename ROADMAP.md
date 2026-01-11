@@ -71,9 +71,9 @@ deselectAllProjects: () => {
 export function BatchActionsBar() {
   const { selectedProjects, projects } = useStore();
   const selectedCount = selectedProjects.size;
-  
+
   if (selectedCount === 0) return null;
-  
+
   return (
     <motion.div className="glass-panel fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
       <div className="flex items-center gap-4 px-6 py-3">
@@ -101,11 +101,11 @@ export function BatchActionsBar() {
 export function BranchSelector({ projectPath }: { projectPath: string }) {
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  
+
   useEffect(() => {
     getBranches(projectPath).then(setBranches);
   }, [projectPath]);
-  
+
   return (
     <Dropdown>
       {/* Lista de ramas con botón de crear/eliminar */}
@@ -133,11 +133,11 @@ export function BranchSelector({ projectPath }: { projectPath: string }) {
 ```tsx
 export function CommitHistoryModal({ projectPath }: Props) {
   const [commits, setCommits] = useState<GitCommit[]>([]);
-  
+
   useEffect(() => {
     getCommits(projectPath, 50).then(setCommits);
   }, [projectPath]);
-  
+
   return (
     <Modal>
       <Timeline>
@@ -165,7 +165,7 @@ export function CommitHistoryModal({ projectPath }: Props) {
 ```tsx
 export function AdvancedFilters() {
   const { filters, setFilters } = useStore();
-  
+
   return (
     <div className="glass-panel p-4">
       <Select
@@ -180,14 +180,14 @@ export function AdvancedFilters() {
           { value: 'behind', label: 'Commits para bajar' },
         ]}
       />
-      
+
       <MultiSelect
         label="Plataformas"
         value={filters.platforms}
         onChange={(v) => setFilters({ platforms: v })}
         options={['github', 'gitlab', 'bitbucket', 'azure']}
       />
-      
+
       <Checkbox
         label="Solo sin commitear"
         checked={filters.hasUncommitted}
@@ -208,12 +208,12 @@ export function AdvancedFilters() {
 ```tsx
 export function StashPanel({ projectPath }: Props) {
   const [stashes, setStashes] = useState<GitStash[]>([]);
-  
+
   const loadStashes = async () => {
     const list = await getStashList(projectPath);
     setStashes(list);
   };
-  
+
   return (
     <Panel>
       <Button onClick={() => stashSave(projectPath, prompt('Mensaje'))}>
@@ -243,11 +243,11 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 export function DiffViewer({ projectPath, filePath }: Props) {
   const [diff, setDiff] = useState('');
-  
+
   useEffect(() => {
     getDiff(projectPath, filePath).then(setDiff);
   }, [projectPath, filePath]);
-  
+
   return (
     <Modal>
       <SyntaxHighlighter language="diff" style={vscDarkPlus}>
@@ -283,10 +283,10 @@ import { BarChart, LineChart } from 'recharts';
 export function StatsPanel() {
   const { projects } = useStore();
   const [stats, setStats] = useState<RepoStats[]>([]);
-  
+
   // Cargar estadísticas de todos los proyectos
   // Mostrar gráficos con recharts
-  
+
   return (
     <div className="grid grid-cols-2 gap-4">
       <Card title="Actividad Semanal">
@@ -314,7 +314,7 @@ npm install recharts
 export function useKeyboardShortcuts() {
   const { scanCurrentEnvironment, setSearchQuery } = useStore();
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
-  
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
@@ -330,11 +330,11 @@ export function useKeyboardShortcuts() {
         scanCurrentEnvironment();
       }
     };
-    
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
-  
+
   return { showQuickSwitcher, setShowQuickSwitcher };
 }
 ```
@@ -349,25 +349,25 @@ export function useKeyboardShortcuts() {
 ```tsx
 export function useAutoSync() {
   const { autoSyncConfig, projects, addToast } = useStore();
-  
+
   useEffect(() => {
     if (!autoSyncConfig.enabled) return;
-    
+
     const interval = setInterval(async () => {
       const paths = projects.map(p => p.path);
       const results = await batchGitFetch(paths);
-      
-      const updates = results.filter(([_, result]) => 
+
+      const updates = results.filter(([_, result]) =>
         'Ok' in result && result.Ok.includes('new commits')
       );
-      
+
       if (updates.length > 0 && autoSyncConfig.notifyOnUpdates) {
         new Notification('Actualizaciones disponibles', {
           body: `${updates.length} repositorios tienen nuevos commits`
         });
       }
     }, autoSyncConfig.intervalMinutes * 60 * 1000);
-    
+
     return () => clearInterval(interval);
   }, [autoSyncConfig, projects]);
 }
@@ -383,7 +383,7 @@ export function useAutoSync() {
 ```tsx
 export function TagManager() {
   const { tags, addTag, deleteTag } = useStore();
-  
+
   return (
     <Modal>
       <TagList>
@@ -413,7 +413,7 @@ export function TagManager() {
 ```tsx
 export function GitOperationsLog() {
   const { gitOperations } = useStore();
-  
+
   return (
     <Panel>
       <Timeline>
@@ -462,21 +462,21 @@ import { FitAddon } from '@xterm/addon-fit';
 export function TerminalPanel({ projectPath }: Props) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const [terminal, setTerminal] = useState<Terminal | null>(null);
-  
+
   useEffect(() => {
     if (!terminalRef.current) return;
-    
+
     const term = new Terminal();
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(terminalRef.current);
     fitAddon.fit();
-    
+
     setTerminal(term);
-    
+
     return () => term.dispose();
   }, []);
-  
+
   return <div ref={terminalRef} className="terminal-container" />;
 }
 ```
@@ -531,7 +531,7 @@ interface StoreState extends AppStore {
   toggleProjectSelection: (path: string) => void;
   selectAllProjects: () => void;
   deselectAllProjects: () => void;
-  
+
   // Tags
   tags: Record<string, ProjectTag>;
   projectTags: Record<string, string[]>;
@@ -539,15 +539,15 @@ interface StoreState extends AppStore {
   deleteTag: (tagId: string) => void;
   addTagToProject: (projectPath: string, tagId: string) => void;
   removeTagFromProject: (projectPath: string, tagId: string) => void;
-  
+
   // Operaciones Git
   gitOperations: GitOperation[];
   addGitOperation: (op: Omit<GitOperation, 'id' | 'timestamp'>) => void;
-  
+
   // Auto-sync
   autoSyncConfig: AutoSyncConfig;
   updateAutoSyncConfig: (config: Partial<AutoSyncConfig>) => void;
-  
+
   // Filtros
   filters: ProjectFilters;
   setFilters: (filters: Partial<ProjectFilters>) => void;
