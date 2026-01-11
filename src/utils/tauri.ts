@@ -40,12 +40,12 @@ export async function saveConfig(config: AppConfig): Promise<void> {
   return invoke<void>('save_config', { config });
 }
 
-export async function openInIDE(projectPath: string): Promise<void> {
-  return invoke<void>('open_in_vscode', { projectPath });
+export async function openInIDE(projectPath: string, ideCommand: string = 'code'): Promise<void> {
+  return invoke<void>('open_in_ide', { projectPath, ideCommand });
 }
 
 // Alias para compatibilidad
-export const openInVscode = openInIDE;
+export const openInVscode = (projectPath: string) => openInIDE(projectPath, 'code');
 
 export async function openInExplorer(projectPath: string): Promise<void> {
   return invoke<void>('open_in_explorer', { projectPath });
@@ -95,6 +95,10 @@ export async function listGitConfig(): Promise<GitConfigEntry[]> {
   return invoke<GitConfigEntry[]>('list_git_config');
 }
 
+export async function getConfigPath(): Promise<string> {
+  return invoke<string>('get_config_file_path');
+}
+
 // Pull all projects result
 export interface PullResult {
   project_name: string;
@@ -123,12 +127,14 @@ export function getDefaultConfig(): AppConfig {
     version: '2.0.0',
     environments: [],
     favorites: {},
+    projectNotes: {},
     projectsCache: {},
     settings: {
       theme: 'dark',
       defaultView: 'grid',
       showFavoritesFirst: true,
       autoScanOnStart: true,
+      ideCommand: 'code',
     },
   };
 }

@@ -140,12 +140,11 @@ export function EnvironmentModal() {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg max-h-[90vh] glass-modal flex flex-col overflow-hidden"
+            className="relative w-full max-w-2xl glass-modal flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 flex-shrink-0"
-                 style={{ borderBottom: '1px solid rgba(99, 163, 255, 0.15)' }}>
-              <h2 className="text-xl font-bold text-white">
+            <div className="flex items-center justify-between p-6 flex-shrink-0 border-b border-[var(--glass-border-light)]">
+              <h2 className="text-xl font-bold text-theme-primary">
                 {isEditMode ? 'Editar Entorno' : 'Nuevo Entorno'}
               </h2>
               <button
@@ -158,27 +157,47 @@ export function EnvironmentModal() {
 
             {/* Form - Scrollable */}
             <form id="environment-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
-                  Nombre del Entorno
-                </label>
-                <div className="relative">
-                  <Folder className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Ej: Desarrollo, PRO, PRE..."
-                    className="input-base pl-11"
-                    autoFocus
-                  />
+              {/* Grid layout for main fields */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-theme-secondary">
+                    Nombre del Entorno
+                  </label>
+                  <div className="relative">
+                    <Folder className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ej: Desarrollo, PRO, PRE..."
+                      className="input-base pl-11"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                {/* Git Server */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-theme-secondary">
+                    Servidor Git (opcional)
+                  </label>
+                  <div className="relative">
+                    <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
+                    <input
+                      type="text"
+                      value={gitServer}
+                      onChange={(e) => setGitServer(e.target.value)}
+                      placeholder="https://github.com"
+                      className="input-base pl-11"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Base Path */}
+              {/* Base Path - Full width */}
               <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
+                <label className="block text-sm font-medium mb-2 text-theme-secondary">
                   Ruta Base
                 </label>
                 <div className="flex gap-2">
@@ -200,115 +219,94 @@ export function EnvironmentModal() {
                     Explorar
                   </button>
                 </div>
-                <p className="text-xs mt-1.5" style={{ color: '#9ca3af' }}>
+                <p className="text-xs mt-1.5 text-theme-muted">
                   Carpeta donde están los proyectos de este entorno
                 </p>
               </div>
 
-              {/* Git Server */}
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
-                  Servidor Git (opcional)
-                </label>
-                <div className="relative">
-                  <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
-                  <input
-                    type="text"
-                    value={gitServer}
-                    onChange={(e) => setGitServer(e.target.value)}
-                    placeholder="https://github.com o URL personalizada"
-                    className="input-base pl-11"
-                  />
-                </div>
-                <p className="text-xs mt-1.5" style={{ color: '#9ca3af' }}>
-                  URL del servidor Git para clonar nuevos proyectos
-                </p>
-              </div>
-
-              {/* Color Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
-                  <div className="flex items-center gap-2">
-                    <Palette className="w-4 h-4" />
-                    Color del Entorno
+              {/* Color and Icon Selection in grid */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Color Selection */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-theme-secondary">
+                    <div className="flex items-center gap-2">
+                      <Palette className="w-4 h-4" />
+                      Color del Entorno
+                    </div>
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {availableColors.map((color) => {
+                      const colorData = environmentColors[color];
+                      const isGradient = colorData.gradient.startsWith('linear-gradient');
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setSelectedColor(color)}
+                          className="w-8 h-8 rounded-lg transition-all duration-200"
+                          style={{
+                            ...(isGradient
+                              ? { background: colorData.gradient }
+                              : { backgroundColor: colorData.primary }),
+                            ...(selectedColor === color
+                              ? {
+                                  boxShadow: '0 0 0 2px #0f1a2b, 0 0 0 4px #FFFFFF',
+                                  transform: 'scale(1.1)'
+                                }
+                              : {})
+                          }}
+                          title={color.charAt(0).toUpperCase() + color.slice(1)}
+                        />
+                      );
+                    })}
                   </div>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {availableColors.map((color) => {
-                    const colorData = environmentColors[color];
-                    const isGradient = colorData.gradient.startsWith('linear-gradient');
-                    return (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setSelectedColor(color)}
-                        className="w-8 h-8 rounded-lg transition-all duration-200"
-                        style={{
-                          ...(isGradient
-                            ? { background: colorData.gradient }
-                            : { backgroundColor: colorData.primary }),
-                          ...(selectedColor === color
-                            ? {
-                                boxShadow: '0 0 0 2px #0f1a2b, 0 0 0 4px #FFFFFF',
-                                transform: 'scale(1.1)'
-                              }
-                            : {})
-                        }}
-                        title={color.charAt(0).toUpperCase() + color.slice(1)}
-                      />
-                    );
-                  })}
                 </div>
-              </div>
 
-              {/* Icon Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: '#D1D5DB' }}>
-                  Icono del Entorno
-                </label>
-                <div className="grid grid-cols-6 gap-2">
-                  {availableIcons.map((iconName) => {
-                    const IconComponent = iconComponents[iconName];
-                    const colorData = environmentColors[selectedColor];
-                    const isGradient = colorData.gradient.startsWith('linear-gradient');
-                    return (
-                      <button
-                        key={iconName}
-                        type="button"
-                        onClick={() => setSelectedIcon(iconName)}
-                        className="p-2.5 rounded-lg transition-all duration-200 flex items-center justify-center"
-                        style={
-                          selectedIcon === iconName
-                            ? {
-                                ...(isGradient
-                                  ? { background: colorData.gradient }
-                                  : { backgroundColor: colorData.primary }),
-                                color: 'white',
-                                boxShadow: '0 0 0 2px #0f1a2b, 0 0 0 4px rgba(99, 163, 255, 0.5)',
-                                transform: 'scale(1.1)'
-                              }
-                            : {
-                                backgroundColor: 'rgba(15, 31, 55, 0.8)',
-                                color: '#9ca3af',
-                                border: '1px solid rgba(99, 163, 255, 0.2)'
-                              }
-                        }
-                        title={iconName}
-                      >
-                        <IconComponent className="w-5 h-5" />
-                      </button>
-                    );
-                  })}
+                {/* Icon Selection */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-theme-secondary">
+                    Icono del Entorno
+                  </label>
+                  <div className="grid grid-cols-6 gap-2">
+                    {availableIcons.map((iconName) => {
+                      const IconComponent = iconComponents[iconName];
+                      const colorData = environmentColors[selectedColor];
+                      const isGradient = colorData.gradient.startsWith('linear-gradient');
+                      return (
+                        <button
+                          key={iconName}
+                          type="button"
+                          onClick={() => setSelectedIcon(iconName)}
+                          className="p-2 rounded-lg transition-all duration-200 flex items-center justify-center"
+                          style={
+                            selectedIcon === iconName
+                              ? {
+                                  ...(isGradient
+                                    ? { background: colorData.gradient }
+                                    : { backgroundColor: colorData.primary }),
+                                  color: 'white',
+                                  boxShadow: '0 0 0 2px var(--bg-base), 0 0 0 4px var(--glass-border)',
+                                  transform: 'scale(1.05)'
+                                }
+                              : {
+                                  backgroundColor: 'var(--bg-elevated)',
+                                  color: 'var(--text-muted)',
+                                  border: '1px solid var(--glass-border-light)'
+                                }
+                          }
+                          title={iconName}
+                        >
+                          <IconComponent className="w-4 h-4" />
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
               {/* Preview */}
-              <div className="p-4 rounded-xl"
-                   style={{
-                     background: 'rgba(15, 31, 55, 0.8)',
-                     border: '1px solid rgba(99, 163, 255, 0.2)'
-                   }}>
-                <p className="text-xs mb-2" style={{ color: '#9ca3af' }}>Vista previa</p>
+              <div className="p-4 rounded-xl bg-theme-elevated border border-[var(--glass-border-light)]">
+                <p className="text-xs mb-2 text-theme-muted">Vista previa</p>
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center"
@@ -324,10 +322,10 @@ export function EnvironmentModal() {
                     })()}
                   </div>
                   <div>
-                    <p className="font-medium text-white">
+                    <p className="font-medium text-theme-primary">
                       {name || 'Nombre del entorno'}
                     </p>
-                    <p className="text-xs truncate max-w-[250px]" style={{ color: '#9ca3af' }}>
+                    <p className="text-xs truncate max-w-[350px] text-theme-muted">
                       {basePath || 'Ruta base...'}
                     </p>
                   </div>
@@ -336,19 +334,12 @@ export function EnvironmentModal() {
             </form>
 
             {/* Actions - Footer outside scroll */}
-            <div className="flex items-center justify-between p-6 flex-shrink-0"
-                 style={{
-                   borderTop: '1px solid rgba(99, 163, 255, 0.15)',
-                   background: 'rgba(15, 31, 55, 0.5)'
-                 }}>
+            <div className="flex items-center justify-between p-6 flex-shrink-0 border-t border-[var(--glass-border-light)] bg-theme-elevated">
               {isEditMode ? (
                 <button
                   type="button"
                   onClick={handleOpenDeleteModal}
-                  className="text-sm font-medium flex items-center gap-2 transition-colors"
-                  style={{ color: '#EF4444' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#fca5a5'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#EF4444'}
+                  className="text-sm font-medium flex items-center gap-2 transition-colors text-red-500 hover:text-red-400"
                 >
                   <Trash2 className="w-4 h-4" />
                   Eliminar entorno

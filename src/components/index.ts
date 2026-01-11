@@ -1,8 +1,17 @@
 export { Sidebar } from './Sidebar';
-export { ProjectCard } from './ProjectCard';
 export { ProjectCardCompact } from './ProjectCardCompact';
+export { ProjectCardSkeleton } from './ProjectCardSkeleton';
 export { ProjectGrid } from './ProjectGrid';
 export { EnvironmentModal } from './EnvironmentModal';
 export { GitConfigModal } from './GitConfigModal';
 export { FavoriteNoteModal } from './FavoriteNoteModal';
 export { ToastContainer } from './ToastContainer';
+export { BatchActionsBar } from './BatchActionsBar';
+export { AdvancedFiltersPanel } from './AdvancedFiltersPanel';
+export { QuickSwitcher } from './QuickSwitcher';
+export { TagManager } from './TagManager';
+export { GitOperationsLog } from './GitOperationsLog';
+export { Logo } from './Logo';
+export { TitleBar } from './TitleBar';
+export { IdeIcon, IDE_OPTIONS, IDE_INSTALL_INSTRUCTIONS, getIdeLabel } from './IdeIcon';
+export { PullResultsModal } from './PullResultsModal';

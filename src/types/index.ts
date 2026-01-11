@@ -69,15 +69,11 @@ export interface GitStatus {
   status_message: string;
 }
 
-// Extended Project with Git Status
-export interface ProjectWithStatus extends Project {
-  gitStatus?: GitStatus;
-}
-
 export interface AppConfig {
   version: string;
   environments: Environment[];
   favorites: Record<string, Favorite>;
+  projectNotes: Record<string, string>; // Notas independientes de favoritos
   projectsCache: Record<string, Record<string, Project>>;
   settings: AppSettings;
 }
@@ -87,15 +83,51 @@ export interface AppSettings {
   defaultView: 'grid' | 'list';
   showFavoritesFirst: boolean;
   autoScanOnStart: boolean;
+  ideCommand: string;
 }
 
 export type GitPlatform = 'github' | 'gitlab' | 'bitbucket' | 'azure' | 'other';
 
+// Project Tag
+export interface ProjectTag {
+  id: string;
+  name: string;
+  color: string;
+  icon?: string;
+  createdAt: string;
+}
+
+// Git Operation
 export interface GitOperation {
-  type: 'clone' | 'pull' | 'config';
+  id: string;
+  type: 'clone' | 'pull' | 'push' | 'fetch' | 'checkout' | 'stash' | 'config' | 'batch';
   status: 'pending' | 'running' | 'success' | 'error';
   message: string;
   timestamp: string;
+  projectPath?: string;
+  projectName?: string;
+  details?: string;
+  duration?: number;
+}
+
+// Auto Sync Configuration
+export interface AutoSyncConfig {
+  enabled: boolean;
+  intervalMinutes: number;
+  notifyOnUpdates: boolean;
+  autoFetchOnStart: boolean;
+  environments: string[];
+}
+
+// Advanced Filters
+export interface ProjectFilters {
+  searchQuery: string;
+  showOnlyFavorites: boolean;
+  gitStatus: 'all' | 'with-changes' | 'up-to-date' | 'ahead' | 'behind';
+  platforms: GitPlatform[];
+  branches: string[];
+  tags: string[];
+  hasUncommitted: boolean | null;
 }
 
 export interface ToastMessage {
@@ -133,24 +165,16 @@ export interface GitPullModalData {
   projectName: string;
 }
 
-export interface SettingsModalData {
-  currentSettings: AppSettings;
-}
-
-export interface GitVariablesModalData {
-  // No data needed, just opens the modal
+export interface FavoriteNoteModalData {
+  projectName: string;
+  currentNote: string;
 }
 
 export interface DeleteEnvironmentModalData {
   environment: Environment;
 }
 
-export interface FavoriteNoteModalData {
-  projectName: string;
-  currentNote: string;
-}
-
-// Store slices types
+// Store types
 export interface EnvironmentsSlice {
   environments: Environment[];
   activeEnvironmentId: string | null;
@@ -166,19 +190,33 @@ export interface ProjectsSlice {
   searchQuery: string;
   viewMode: 'grid' | 'list';
   showOnlyFavorites: boolean;
+  selectedProjects: Set<string>;
+  refreshTrigger: number;
+  filters: ProjectFilters;
   setProjects: (projects: Project[]) => void;
   setSearchQuery: (query: string) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setShowOnlyFavorites: (show: boolean) => void;
   setIsLoading: (loading: boolean) => void;
+  toggleProjectSelection: (projectPath: string) => void;
+  selectAllProjects: () => void;
+  deselectAllProjects: () => void;
+  setFilters: (filters: Partial<ProjectFilters>) => void;
+  resetFilters: () => void;
+  triggerRefresh: () => void;
 }
 
 export interface FavoritesSlice {
   favorites: Record<string, Favorite>;
   toggleFavorite: (projectName: string) => void;
-  updateFavoriteNote: (projectName: string, note: string) => void;
   isFavorite: (projectName: string) => boolean;
-  getFavoriteNote: (projectName: string) => string;
+}
+
+export interface ProjectNotesSlice {
+  projectNotes: Record<string, string>;
+  updateProjectNote: (projectName: string, note: string) => void;
+  getProjectNote: (projectName: string) => string;
+  hasProjectNote: (projectName: string) => boolean;
 }
 
 export interface UISlice {
@@ -188,9 +226,11 @@ export interface UISlice {
   cloneModal: ModalState & { data?: CloneModalData };
   favoriteNoteModal: ModalState & { data?: FavoriteNoteModalData };
   gitPullModal: ModalState & { data?: GitPullModalData };
-  settingsModal: ModalState & { data?: SettingsModalData };
-  gitVariablesModal: ModalState & { data?: GitVariablesModalData };
+  settingsModal: ModalState;
+  gitVariablesModal: ModalState;
   deleteEnvironmentModal: ModalState & { data?: DeleteEnvironmentModalData };
+  tagManagerModal: ModalState;
+  gitOperationsLogModal: ModalState;
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
   removeToast: (id: string) => void;
   openEnvironmentModal: (data: EnvironmentModalData) => void;
@@ -209,12 +249,32 @@ export interface UISlice {
   closeGitVariablesModal: () => void;
   openDeleteEnvironmentModal: (data: DeleteEnvironmentModalData) => void;
   closeDeleteEnvironmentModal: () => void;
+  openTagManagerModal: () => void;
+  closeTagManagerModal: () => void;
+  openGitOperationsLogModal: () => void;
+  closeGitOperationsLogModal: () => void;
 }
 
-export type AppStore = EnvironmentsSlice & ProjectsSlice & FavoritesSlice & UISlice & {
+export type AppStore = EnvironmentsSlice & ProjectsSlice & FavoritesSlice & ProjectNotesSlice & UISlice & {
   config: AppConfig | null;
   isInitialized: boolean;
+  // Tags
+  tags: Record<string, ProjectTag>;
+  projectTags: Record<string, string[]>;
+  addTag: (tag: Omit<ProjectTag, 'id' | 'createdAt'>) => string;
+  deleteTag: (tagId: string) => void;
+  addTagToProject: (projectPath: string, tagId: string) => void;
+  removeTagFromProject: (projectPath: string, tagId: string) => void;
+  // Git Operations History
+  gitOperations: GitOperation[];
+  addGitOperation: (operation: Omit<GitOperation, 'id' | 'timestamp'>) => void;
+  // Auto Sync
+  autoSyncConfig: AutoSyncConfig;
+  updateAutoSyncConfig: (config: Partial<AutoSyncConfig>) => void;
+  // Methods
   initialize: () => Promise<void>;
   saveConfig: () => Promise<void>;
-  scanCurrentEnvironment: () => Promise<void>;
+  scanCurrentEnvironment: (silent?: boolean) => Promise<void>;
+  pullAllProjects: () => Promise<void>;
+  fetchAllProjects: () => Promise<void>;
 };

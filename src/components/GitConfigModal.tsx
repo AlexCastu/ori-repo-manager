@@ -77,19 +77,18 @@ export function GitConfigModal() {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md bg-dark-900 border border-white/10
-                       rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-md modal-base overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-white/5">
+            <div className="flex items-center justify-between p-6 border-b border-[var(--glass-border-light)]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500/20 to-accent-500/20
                                 flex items-center justify-center">
                   <Settings className="w-5 h-5 text-primary-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">Git Config</h2>
-                  <p className="text-sm text-gray-500">{data?.projectName}</p>
+                  <h2 className="text-lg font-bold text-theme-primary">Git Config</h2>
+                  <p className="text-sm text-theme-muted">{data?.projectName}</p>
                 </div>
               </div>
               <button
@@ -102,17 +101,17 @@ export function GitConfigModal() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-theme-secondary">
                 Configura el nombre y email para los commits en este repositorio.
               </p>
 
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-theme-secondary mb-2">
                   user.name
                 </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
                   <input
                     type="text"
                     value={name}
@@ -126,11 +125,11 @@ export function GitConfigModal() {
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-theme-secondary mb-2">
                   user.email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
                   <input
                     type="email"
                     value={email}
@@ -142,7 +141,7 @@ export function GitConfigModal() {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--glass-border-light)]">
                 <button
                   type="button"
                   onClick={closeGitConfigModal}

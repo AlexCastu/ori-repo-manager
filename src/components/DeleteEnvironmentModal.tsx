@@ -38,8 +38,7 @@ export function DeleteEnvironmentModal() {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-md bg-dark-900 border border-red-500/30
-                     rounded-2xl shadow-2xl overflow-hidden"
+          className="relative w-full max-w-md modal-base border-red-500/30 overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-red-500/20 bg-red-500/10">
@@ -48,38 +47,38 @@ export function DeleteEnvironmentModal() {
                 <AlertTriangle className="w-6 h-6 text-red-400" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Eliminar Entorno</h2>
-                <p className="text-sm text-red-300">Esta acción no se puede deshacer</p>
+                <h2 className="text-xl font-bold text-theme-primary">Eliminar Entorno</h2>
+                <p className="text-sm text-red-400">Esta acción no se puede deshacer</p>
               </div>
             </div>
             <button
               onClick={closeDeleteEnvironmentModal}
-              className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              className="btn-icon"
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
           <div className="p-6">
-            <div className="p-4 bg-dark-800 rounded-xl border border-white/5 mb-4">
-              <p className="text-sm text-gray-400 mb-1">Entorno a eliminar:</p>
-              <p className="text-lg font-semibold text-white">{environment.name}</p>
-              <p className="text-xs text-gray-500 mt-1 truncate">{environment.basePath}</p>
+            <div className="panel-dark p-4 mb-4">
+              <p className="text-sm text-theme-muted mb-1">Entorno a eliminar:</p>
+              <p className="text-lg font-semibold text-theme-primary">{environment.name}</p>
+              <p className="text-xs text-theme-muted mt-1 truncate">{environment.basePath}</p>
             </div>
 
-            <div className="space-y-2 text-sm text-gray-400">
+            <div className="space-y-2 text-sm text-theme-secondary">
               <p>• Se eliminará la configuración del entorno</p>
-              <p>• Los proyectos <strong className="text-white">NO</strong> serán eliminados del disco</p>
+              <p>• Los proyectos <strong className="text-theme-primary">NO</strong> serán eliminados del disco</p>
               <p>• Se perderán las notas de favoritos de este entorno</p>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 p-6 border-t border-white/5 bg-dark-900">
+          <div className="flex justify-end gap-3 p-6 border-t border-[var(--glass-border-light)] bg-theme-elevated">
             <button
               onClick={closeDeleteEnvironmentModal}
-              className="px-4 py-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+              className="btn-secondary"
             >
               Cancelar
             </button>

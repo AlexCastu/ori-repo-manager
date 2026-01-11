@@ -1,10 +1,14 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/core';
 import type {
   AppStore,
   Project,
   ToastMessage,
-  AppConfig
+  AppConfig,
+  ProjectTag,
+  GitOperation
 } from '../types';
 import {
   loadConfig,
@@ -32,9 +36,39 @@ export const useStore = create<AppStore>()(
       searchQuery: '',
       viewMode: 'grid',
       showOnlyFavorites: false,
+      selectedProjects: new Set<string>(),
+      refreshTrigger: 0, // Counter to trigger git status refresh in cards
+      filters: {
+        searchQuery: '',
+        showOnlyFavorites: false,
+        gitStatus: 'all',
+        platforms: [],
+        branches: [],
+        tags: [],
+        hasUncommitted: null,
+      },
+
+      // Tags
+      tags: {},
+      projectTags: {},
+
+      // Git Operations History
+      gitOperations: [],
+
+      // Auto Sync
+      autoSyncConfig: {
+        enabled: false,
+        intervalMinutes: 5,
+        notifyOnUpdates: true,
+        autoFetchOnStart: false,
+        environments: [],
+      },
 
       // Favorites
       favorites: {},
+
+      // Project Notes (independiente de favoritos)
+      projectNotes: {},
 
       // UI State
       toasts: [],
@@ -46,6 +80,8 @@ export const useStore = create<AppStore>()(
       settingsModal: { isOpen: false },
       gitVariablesModal: { isOpen: false },
       deleteEnvironmentModal: { isOpen: false },
+      tagManagerModal: { isOpen: false },
+      gitOperationsLogModal: { isOpen: false },
 
       // Initialize app
       initialize: async () => {
@@ -63,6 +99,7 @@ export const useStore = create<AppStore>()(
             config,
             environments: config.environments,
             favorites: config.favorites,
+            projectNotes: config.projectNotes || {},
             isInitialized: true,
           });
 
@@ -91,7 +128,7 @@ export const useStore = create<AppStore>()(
 
       // Save config
       saveConfig: async () => {
-        const { environments, favorites, config, projects, activeEnvironmentId } = get();
+        const { environments, favorites, projectNotes, config, projects, activeEnvironmentId } = get();
         if (!config) return;
 
         // Update projects cache for active environment
@@ -107,6 +144,7 @@ export const useStore = create<AppStore>()(
           ...config,
           environments,
           favorites,
+          projectNotes,
           projectsCache,
         };
 
@@ -124,7 +162,7 @@ export const useStore = create<AppStore>()(
       },
 
       // Scan current environment for projects
-      scanCurrentEnvironment: async () => {
+      scanCurrentEnvironment: async (silent: boolean = false) => {
         const { activeEnvironmentId, environments, config } = get();
         if (!activeEnvironmentId || !config) return;
 
@@ -154,11 +192,14 @@ export const useStore = create<AppStore>()(
           await saveConfigToFile(updatedConfig);
           set({ config: updatedConfig });
 
-          get().addToast({
-            type: 'success',
-            title: 'Escaneo completado',
-            message: `Se encontraron ${projects.length} proyectos`,
-          });
+          // Only show toast if not silent
+          if (!silent) {
+            get().addToast({
+              type: 'success',
+              title: 'Escaneo completado',
+              message: `Se encontraron ${projects.length} proyectos`,
+            });
+          }
         } catch (error) {
           console.error('Failed to scan projects:', error);
           get().addToast({
@@ -169,6 +210,136 @@ export const useStore = create<AppStore>()(
         } finally {
           set({ isLoading: false });
         }
+      },
+
+      // Pull all projects
+      pullAllProjects: async () => {
+        const { projects } = get();
+        if (projects.length === 0) {
+          get().addToast({
+            type: 'warning',
+            title: 'Sin proyectos',
+            message: 'No hay proyectos para actualizar',
+          });
+          return;
+        }
+
+        set({ isLoading: true });
+        const startTime = Date.now();
+        const results = { success: 0, failed: 0 };
+
+        for (const project of projects) {
+          try {
+            await invoke('run_git_pull', {
+              repoPath: project.path,
+              username: '',
+              password: ''
+            });
+            results.success++;
+          } catch (error) {
+            results.failed++;
+            get().addGitOperation({
+              type: 'pull',
+              status: 'error',
+              message: `Error en pull de ${project.name}`,
+              projectName: project.name,
+              details: String(error),
+              duration: Date.now() - startTime,
+            });
+          }
+        }
+
+        set({ isLoading: false });
+
+        if (results.success > 0) {
+          get().addToast({
+            type: 'success',
+            title: 'Pull completado',
+            message: `${results.success} proyectos actualizados${results.failed > 0 ? `, ${results.failed} fallaron` : ''}`,
+          });
+        } else {
+          get().addToast({
+            type: 'error',
+            title: 'Error',
+            message: `Todos los pulls fallaron (${results.failed})`,
+          });
+        }
+
+        // Rescan after pull
+        await get().scanCurrentEnvironment();
+      },
+
+      // Fetch all projects from ALL environments (updates remote info like branch ahead/behind)
+      fetchAllProjects: async () => {
+        const { config } = get();
+        if (!config || config.environments.length === 0) {
+          get().addToast({
+            type: 'warning',
+            title: 'Sin entornos',
+            message: 'No hay entornos configurados',
+          });
+          return;
+        }
+
+        set({ isLoading: true });
+        const startTime = Date.now();
+        const results = { success: 0, failed: 0, total: 0 };
+
+        // Iterate through all environments and their projects
+        for (const environment of config.environments) {
+          try {
+            const reposResult = await invoke<{ projects: Project[] }>('scan_git_repos', {
+              basePath: environment.basePath,
+            });
+
+            for (const project of reposResult.projects) {
+              if (!project.hasGit) continue;
+              results.total++;
+
+              try {
+                await invoke('git_fetch', { repoPath: project.path });
+                results.success++;
+              } catch (error) {
+                results.failed++;
+                console.error(`Fetch failed for ${project.name}:`, error);
+              }
+            }
+          } catch (error) {
+            console.error(`Error scanning environment ${environment.name}:`, error);
+          }
+        }
+
+        set({ isLoading: false });
+
+        if (results.success > 0) {
+          get().addToast({
+            type: 'success',
+            title: 'Sincronización completada',
+            message: `${results.success} de ${results.total} repositorios actualizados${results.failed > 0 ? ` (${results.failed} fallaron)` : ''}`,
+          });
+
+          get().addGitOperation({
+            type: 'fetch',
+            status: 'success',
+            message: `Fetch de ${results.success} repositorios en todos los entornos`,
+            duration: Date.now() - startTime,
+          });
+        } else if (results.total > 0) {
+          get().addToast({
+            type: 'error',
+            title: 'Error',
+            message: `No se pudo actualizar ningún repositorio (${results.failed} fallaron)`,
+          });
+        } else {
+          get().addToast({
+            type: 'warning',
+            title: 'Sin repositorios',
+            message: 'No se encontraron repositorios Git en ningún entorno',
+          });
+        }
+
+        // Rescan current environment to update status
+        await get().scanCurrentEnvironment();
       },
 
       // Environment actions
@@ -193,6 +364,7 @@ export const useStore = create<AppStore>()(
         );
         set((state) => ({
           environments: [...state.environments, newEnv],
+          activeEnvironmentId: newEnv.id, // Set new environment as active
         }));
         get().saveConfig();
         get().addToast({
@@ -200,6 +372,8 @@ export const useStore = create<AppStore>()(
           title: 'Entorno creado',
           message: `${envData.name} añadido correctamente`,
         });
+        // Auto-scan the new environment
+        get().scanCurrentEnvironment();
       },
 
       updateEnvironment: (id, updates) => {
@@ -216,26 +390,161 @@ export const useStore = create<AppStore>()(
       deleteEnvironment: (id) => {
         const { environments, activeEnvironmentId, config } = get();
         const env = environments.find(e => e.id === id);
+        if (!env) return;
 
         // Remove from cache
-        const projectsCache = { ...config?.projectsCache };
-        if (projectsCache[id]) {
-          delete projectsCache[id];
+        if (config) {
+          const updatedCache = { ...config.projectsCache };
+          delete updatedCache[id];
+
+          const updatedConfig = {
+            ...config,
+            projectsCache: updatedCache,
+          };
+
+          set({ config: updatedConfig });
         }
 
+        // Remove from environments
         set((state) => ({
-          environments: state.environments.filter((e) => e.id !== id),
+          environments: state.environments.filter(e => e.id !== id),
           activeEnvironmentId: activeEnvironmentId === id ? null : activeEnvironmentId,
           projects: activeEnvironmentId === id ? [] : state.projects,
-          config: state.config ? { ...state.config, projectsCache } : state.config,
         }));
 
         get().saveConfig();
+
         get().addToast({
           type: 'success',
           title: 'Entorno eliminado',
-          message: env ? `${env.name} eliminado correctamente` : 'Entorno eliminado',
+          message: env.name,
         });
+      },
+
+      // Selection actions
+      toggleProjectSelection: (projectPath) => {
+        set((state) => {
+          const newSelected = new Set(state.selectedProjects);
+          if (newSelected.has(projectPath)) {
+            newSelected.delete(projectPath);
+          } else {
+            newSelected.add(projectPath);
+          }
+          return { selectedProjects: newSelected };
+        });
+      },
+
+      selectAllProjects: () => {
+        set((state) => ({
+          selectedProjects: new Set(state.projects.map(p => p.path))
+        }));
+      },
+
+      deselectAllProjects: () => {
+        set({ selectedProjects: new Set() });
+      },
+
+      // Filter actions
+      setFilters: (newFilters) => {
+        set((state) => ({
+          filters: { ...state.filters, ...newFilters }
+        }));
+      },
+
+      resetFilters: () => {
+        set({
+          filters: {
+            searchQuery: '',
+            showOnlyFavorites: false,
+            gitStatus: 'all',
+            platforms: [],
+            branches: [],
+            tags: [],
+            hasUncommitted: null,
+          }
+        });
+      },
+
+      triggerRefresh: () => {
+        set((state) => ({
+          refreshTrigger: state.refreshTrigger + 1
+        }));
+      },
+
+      // Tag actions
+      addTag: (tagData) => {
+        const id = generateId();
+        const newTag: ProjectTag = {
+          ...tagData,
+          id,
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({
+          tags: { ...state.tags, [id]: newTag }
+        }));
+        get().saveConfig();
+        return id;
+      },
+
+      deleteTag: (tagId) => {
+        set((state) => {
+          const newTags = { ...state.tags };
+          delete newTags[tagId];
+
+          // Remove tag from all projects
+          const newProjectTags = { ...state.projectTags };
+          Object.keys(newProjectTags).forEach(projectPath => {
+            newProjectTags[projectPath] = newProjectTags[projectPath].filter(id => id !== tagId);
+          });
+
+          return { tags: newTags, projectTags: newProjectTags };
+        });
+        get().saveConfig();
+      },
+
+      addTagToProject: (projectPath, tagId) => {
+        set((state) => {
+          const currentTags = state.projectTags[projectPath] || [];
+          if (currentTags.includes(tagId)) return state;
+
+          return {
+            projectTags: {
+              ...state.projectTags,
+              [projectPath]: [...currentTags, tagId]
+            }
+          };
+        });
+        get().saveConfig();
+      },
+
+      removeTagFromProject: (projectPath, tagId) => {
+        set((state) => ({
+          projectTags: {
+            ...state.projectTags,
+            [projectPath]: (state.projectTags[projectPath] || []).filter(id => id !== tagId)
+          }
+        }));
+        get().saveConfig();
+      },
+
+      // Git Operations
+      addGitOperation: (opData) => {
+        const operation: GitOperation = {
+          ...opData,
+          id: generateId(),
+          timestamp: new Date().toISOString(),
+        };
+        set((state) => ({
+          gitOperations: [operation, ...state.gitOperations].slice(0, 100) // Keep last 100
+        }));
+      },
+
+      // Auto Sync
+      updateAutoSyncConfig: (config) => {
+        set((state) => ({
+          autoSyncConfig: { ...state.autoSyncConfig, ...config }
+        }));
+        get().saveConfig();
       },
 
       // Project actions
@@ -266,29 +575,34 @@ export const useStore = create<AppStore>()(
         get().saveConfig();
       },
 
-      updateFavoriteNote: (projectName, note) => {
-        set((state) => {
-          if (!state.favorites[projectName]) return state;
-
-          return {
-            favorites: {
-              ...state.favorites,
-              [projectName]: {
-                ...state.favorites[projectName],
-                note,
-              },
-            },
-          };
-        });
-        get().saveConfig();
-      },
-
       isFavorite: (projectName) => {
         return !!get().favorites[projectName];
       },
 
-      getFavoriteNote: (projectName) => {
-        return get().favorites[projectName]?.note || '';
+      // Project Notes actions (independiente de favoritos)
+      updateProjectNote: (projectName, note) => {
+        set((state) => {
+          const newNotes = { ...state.projectNotes };
+
+          if (note.trim()) {
+            newNotes[projectName] = note.trim();
+          } else {
+            // Si la nota está vacía, eliminarla
+            delete newNotes[projectName];
+          }
+
+          return { projectNotes: newNotes };
+        });
+        get().saveConfig();
+      },
+
+      getProjectNote: (projectName) => {
+        return get().projectNotes[projectName] || '';
+      },
+
+      hasProjectNote: (projectName) => {
+        const note = get().projectNotes[projectName];
+        return !!note && note.trim().length > 0;
       },
 
       // Toast actions
@@ -369,6 +683,20 @@ export const useStore = create<AppStore>()(
       closeDeleteEnvironmentModal: () => {
         set({ deleteEnvironmentModal: { isOpen: false } });
       },
+
+      openTagManagerModal: () => {
+        set({ tagManagerModal: { isOpen: true } });
+      },
+      closeTagManagerModal: () => {
+        set({ tagManagerModal: { isOpen: false } });
+      },
+
+      openGitOperationsLogModal: () => {
+        set({ gitOperationsLogModal: { isOpen: true } });
+      },
+      closeGitOperationsLogModal: () => {
+        set({ gitOperationsLogModal: { isOpen: false } });
+      },
     }),
     {
       name: 'ori-repo-manager-storage',
@@ -395,40 +723,58 @@ export const useViewMode = () => useStore((state) => state.viewMode);
 export const useIsLoading = () => useStore((state) => state.isLoading);
 export const useToasts = () => useStore((state) => state.toasts);
 
-// Filtered projects selector
+// Filtered projects selector with memoization
 export const useFilteredProjects = () => {
   const projects = useStore((state) => state.projects);
   const searchQuery = useStore((state) => state.searchQuery);
   const showOnlyFavorites = useStore((state) => state.showOnlyFavorites);
   const favorites = useStore((state) => state.favorites);
+  const filters = useStore((state) => state.filters);
+  const config = useStore((state) => state.config);
 
-  return projects
-    .filter((project) => {
-      // Filter by favorites
-      if (showOnlyFavorites && !favorites[project.name]) {
-        return false;
-      }
+  // Get showFavoritesFirst from config settings (defaults to true)
+  const showFavoritesFirst = config?.settings?.showFavoritesFirst ?? true;
 
-      // Filter by search query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return (
-          project.name.toLowerCase().includes(query) ||
-          project.gitUrl?.toLowerCase().includes(query)
-        );
-      }
+  // Memoize the filtered and sorted result
+  return useMemo(() => {
+    return projects
+      .filter((project) => {
+        // Filter by favorites
+        if (showOnlyFavorites && !favorites[project.name]) {
+          return false;
+        }
 
-      return true;
-    })
-    .sort((a, b) => {
-      // Sort favorites first
-      const aFav = favorites[a.name];
-      const bFav = favorites[b.name];
+        // Filter by search query
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          const matchesSearch =
+            project.name.toLowerCase().includes(query) ||
+            project.gitUrl?.toLowerCase().includes(query);
+          if (!matchesSearch) return false;
+        }
 
-      if (aFav && !bFav) return -1;
-      if (!aFav && bFav) return 1;
-      if (aFav && bFav) return aFav.order - bFav.order;
+        // Advanced filters
+        // Platform filter
+        if (filters.platforms.length > 0) {
+          if (!filters.platforms.includes(project.platform || 'other')) {
+            return false;
+          }
+        }
 
-      return a.name.localeCompare(b.name);
-    });
+        return true;
+      })
+      .sort((a, b) => {
+        // Only sort favorites first if setting is enabled
+        if (showFavoritesFirst) {
+          const aFav = favorites[a.name];
+          const bFav = favorites[b.name];
+
+          if (aFav && !bFav) return -1;
+          if (!aFav && bFav) return 1;
+          if (aFav && bFav) return aFav.order - bFav.order;
+        }
+
+        return a.name.localeCompare(b.name);
+      });
+  }, [projects, searchQuery, showOnlyFavorites, favorites, filters, showFavoritesFirst]);
 };

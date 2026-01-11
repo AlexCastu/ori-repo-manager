@@ -1,70 +1,45 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings, Star, RefreshCw, Save, User, Mail, GitBranch, Loader2 } from 'lucide-react';
+import { X, Settings, Star, RefreshCw, Save, FolderOpen, Palette, Copy, CheckCircle2, Sun, Moon, Monitor, Code } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useTheme } from '../contexts/ThemeContext';
-import { getGitGlobalConfig, setGitGlobalConfig } from '../utils/tauri';
+import { getConfigPath } from '../utils/tauri';
+import { IDE_OPTIONS, IdeIcon } from './IdeIcon';
 import type { AppSettings } from '../types';
 
 export function SettingsModal() {
   const { settingsModal, closeSettingsModal, config, addToast, saveConfig } = useStore();
-  const { colors } = useTheme();
+  useTheme(); // Keep theme context active
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Git config state
-  const [gitName, setGitName] = useState('');
-  const [gitEmail, setGitEmail] = useState('');
-  const [isLoadingGit, setIsLoadingGit] = useState(false);
-  const [isSavingGit, setIsSavingGit] = useState(false);
+  const [configPath, setConfigPath] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (settingsModal.isOpen && config) {
       setSettings({ ...config.settings });
-      loadGitConfig();
+      loadConfigPath();
     }
   }, [settingsModal.isOpen, config]);
 
-  const loadGitConfig = async () => {
-    setIsLoadingGit(true);
+  const loadConfigPath = async () => {
     try {
-      const gitConfig = await getGitGlobalConfig();
-      setGitName(gitConfig.name);
-      setGitEmail(gitConfig.email);
+      const path = await getConfigPath();
+      setConfigPath(path);
     } catch (error) {
-      console.error('Failed to load git config:', error);
-    } finally {
-      setIsLoadingGit(false);
+      console.error('Failed to load config path:', error);
     }
   };
 
-  const handleSaveGitConfig = async () => {
-    if (!gitName.trim() || !gitEmail.trim()) {
-      addToast({
-        type: 'warning',
-        title: 'Campos requeridos',
-        message: 'Nombre y email son obligatorios',
-      });
-      return;
-    }
-
-    setIsSavingGit(true);
-    try {
-      await setGitGlobalConfig(gitName.trim(), gitEmail.trim());
-      addToast({
-        type: 'success',
-        title: 'Git configurado',
-        message: 'Configuración global de Git guardada',
-      });
-    } catch (error) {
-      addToast({
-        type: 'error',
-        title: 'Error',
-        message: 'No se pudo guardar la configuración de Git',
-      });
-    } finally {
-      setIsSavingGit(false);
-    }
+  const handleCopyPath = () => {
+    navigator.clipboard.writeText(configPath);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    addToast({
+      type: 'success',
+      title: 'Copiado',
+      message: 'Ruta copiada al portapapeles',
+    });
   };
 
   const handleSave = async () => {
@@ -113,7 +88,7 @@ export function SettingsModal() {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-md glass-modal overflow-hidden"
+          className="relative w-full max-w-2xl glass-modal overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-5"
@@ -125,139 +100,189 @@ export function SettingsModal() {
               >
                 <Settings className="w-5 h-5" style={{ color: '#3B82F6' }} />
               </div>
-              <h2 className="text-lg font-bold text-white">Configuración</h2>
+              <h2 className="text-lg font-bold text-theme-primary">Configuración</h2>
             </div>
             <button
               onClick={closeSettingsModal}
-              className="p-2 rounded-xl transition-colors"
-              style={{ color: '#D1D5DB' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              className="btn-icon"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-5 space-y-6 max-h-[60vh] overflow-y-auto">
-            {/* Git Global Config Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: '#D1D5DB' }}>
-                <GitBranch className="w-4 h-4" style={{ color: '#3B82F6' }} />
-                Configuración Git Global
-              </div>
-
-              {isLoadingGit ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#3B82F6' }} />
-                </div>
-              ) : (
+          <div className="p-6 space-y-6">
+            {/* Grid layout for main settings */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Left Column - Theme & Preferences */}
+              <div className="space-y-5">
+                {/* Theme Settings */}
                 <div className="space-y-3">
-                  {/* Git Name */}
-                  <div>
-                    <label className="block text-xs mb-1.5" style={{ color: '#9ca3af' }}>user.name</label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
-                      <input
-                        type="text"
-                        value={gitName}
-                        onChange={(e) => setGitName(e.target.value)}
-                        placeholder="Tu nombre"
-                        className="input-base pl-10 text-sm"
-                      />
-                    </div>
+                  <div className="flex items-center gap-2 text-sm font-medium text-theme-secondary">
+                    <Palette className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    Tema de Interfaz
                   </div>
-
-                  {/* Git Email */}
-                  <div>
-                    <label className="block text-xs mb-1.5" style={{ color: '#9ca3af' }}>user.email</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#3B82F6' }} />
-                      <input
-                        type="email"
-                        value={gitEmail}
-                        onChange={(e) => setGitEmail(e.target.value)}
-                        placeholder="tu@email.com"
-                        className="input-base pl-10 text-sm"
-                      />
-                    </div>
-                  </div>
-
+                  <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'light', label: 'Claro', icon: Sun },
+                  { value: 'dark', label: 'Oscuro', icon: Moon },
+                  { value: 'system', label: 'Sistema', icon: Monitor },
+                ].map(({ value, label, icon: Icon }) => (
                   <button
-                    onClick={handleSaveGitConfig}
-                    disabled={isSavingGit}
-                    className="w-full py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2"
+                    key={value}
+                    onClick={() => setSettings({ ...settings, theme: value as AppSettings['theme'] })}
+                    className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all border-2"
                     style={{
-                      background: 'rgba(59, 130, 246, 0.2)',
-                      color: '#3B82F6',
-                      border: '1px solid rgba(59, 130, 246, 0.3)'
+                      background: settings.theme === value ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-elevated)',
+                      borderColor: settings.theme === value ? '#3B82F6' : 'transparent',
+                      color: settings.theme === value ? '#3B82F6' : 'var(--text-muted)'
                     }}
                   >
-                    {isSavingGit ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
-                    Guardar Git Config
+                    <Icon className="w-5 h-5" />
+                    <div className="text-xs font-medium">{label}</div>
                   </button>
+                ))}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div style={{ borderTop: '1px solid rgba(99, 163, 255, 0.1)' }} />
+                {/* App Settings / Preferences */}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-theme-secondary">Preferencias</div>
 
-            {/* App Settings */}
-            <div className="space-y-4">
-              <div className="text-sm font-medium" style={{ color: '#D1D5DB' }}>Preferencias</div>
+                  {/* Show Favorites First */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-theme-elevated">
+                    <div className="flex items-center gap-3">
+                      <Star className="w-4 h-4" style={{ color: '#fcd34d' }} />
+                      <span className="text-sm text-theme-secondary">Mostrar favoritos primero</span>
+                    </div>
+                    <button
+                      onClick={() => setSettings({ ...settings, showFavoritesFirst: !settings.showFavoritesFirst })}
+                      className="relative w-11 h-6 rounded-full transition-colors"
+                      style={{ backgroundColor: settings.showFavoritesFirst ? '#3B82F6' : '#4b5563' }}
+                    >
+                      <span
+                        className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                        style={{ left: settings.showFavoritesFirst ? '1.5rem' : '0.25rem' }}
+                      />
+                    </button>
+                  </div>
 
-              {/* Show Favorites First */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Star className="w-4 h-4" style={{ color: '#fcd34d' }} />
-                  <span className="text-sm" style={{ color: '#D1D5DB' }}>Mostrar favoritos primero</span>
+                  {/* Auto Scan on Start */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-theme-elevated">
+                    <div className="flex items-center gap-3">
+                      <RefreshCw className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                      <span className="text-sm text-theme-secondary">Escaneo automático al iniciar</span>
+                    </div>
+                    <button
+                      onClick={() => setSettings({ ...settings, autoScanOnStart: !settings.autoScanOnStart })}
+                      className="relative w-11 h-6 rounded-full transition-colors"
+                      style={{ backgroundColor: settings.autoScanOnStart ? '#3B82F6' : '#4b5563' }}
+                    >
+                      <span
+                        className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                        style={{ left: settings.autoScanOnStart ? '1.5rem' : '0.25rem' }}
+                      />
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setSettings({ ...settings, showFavoritesFirst: !settings.showFavoritesFirst })}
-                  className="relative w-11 h-6 rounded-full transition-colors"
-                  style={{ backgroundColor: settings.showFavoritesFirst ? '#3B82F6' : '#4b5563' }}
-                >
-                  <span
-                    className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
-                    style={{ left: settings.showFavoritesFirst ? '1.5rem' : '0.25rem' }}
-                  />
-                </button>
+
+                {/* IDE Configuration */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-theme-secondary">
+                    <Code className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    Editor de Código
+                  </div>
+                  {/* IDE Selector */}
+                  <div className="relative">
+                    <select
+                      value={settings.ideCommand || 'code'}
+                      onChange={(e) => setSettings({ ...settings, ideCommand: e.target.value })}
+                      className="w-full p-3 pl-11 rounded-lg bg-theme-elevated text-theme-primary text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3B82F6] border border-[var(--glass-border-light)]"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%233B82F6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 12px center',
+                        paddingRight: '40px'
+                      }}
+                    >
+                      {Object.entries(IDE_OPTIONS).map(([command, info]) => (
+                        <option key={command} value={command}>
+                          {info.label} ({command})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <IdeIcon ide={settings.ideCommand || 'code'} size={18} />
+                    </div>
+                  </div>
+                  {/* Custom command input */}
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-theme-elevated border border-[var(--glass-border-light)]">
+                    <span className="text-xs text-theme-muted shrink-0">Comando:</span>
+                    <input
+                      type="text"
+                      value={settings.ideCommand || 'code'}
+                      onChange={(e) => setSettings({ ...settings, ideCommand: e.target.value })}
+                      className="flex-1 bg-transparent text-sm text-theme-primary focus:outline-none"
+                      placeholder="code, cursor, subl..."
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Auto Scan on Start */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <RefreshCw className="w-4 h-4" style={{ color: '#3B82F6' }} />
-                  <span className="text-sm" style={{ color: '#D1D5DB' }}>Escaneo automático al iniciar</span>
+              {/* Right Column - Config & Info */}
+              <div className="space-y-5">
+                {/* Config File Location */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-theme-secondary">
+                    <FolderOpen className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    Ubicación de Configuración
+                  </div>
+                  <div className="p-3 rounded-lg bg-[rgba(59,130,246,0.1)]">
+                    <p className="text-xs mb-2 text-theme-muted">
+                      Archivo de configuración (config.json):
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs px-2 py-1.5 rounded bg-theme-elevated text-theme-secondary overflow-auto max-w-[250px] truncate">
+                        {configPath || 'Cargando...'}
+                      </code>
+                      {configPath && (
+                        <button
+                          onClick={handleCopyPath}
+                          className="p-2 rounded-lg transition-colors flex-shrink-0"
+                          style={{ background: copied ? 'rgba(34, 197, 94, 0.2)' : 'rgba(59, 130, 246, 0.2)', color: copied ? '#22c55e' : '#3B82F6' }}
+                          title="Copiar ruta"
+                        >
+                          {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setSettings({ ...settings, autoScanOnStart: !settings.autoScanOnStart })}
-                  className="relative w-11 h-6 rounded-full transition-colors"
-                  style={{ backgroundColor: settings.autoScanOnStart ? '#3B82F6' : '#4b5563' }}
-                >
-                  <span
-                    className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
-                    style={{ left: settings.autoScanOnStart ? '1.5rem' : '0.25rem' }}
-                  />
-                </button>
-              </div>
-            </div>
 
-            {/* Version Info */}
-            <div className="pt-4" style={{ borderTop: '1px solid rgba(99, 163, 255, 0.15)' }}>
-              <p className="text-xs text-center" style={{ color: '#9ca3af' }}>
-                ORI-RepoManager v{config?.version || '2.0.0'}
-              </p>
+                {/* Version Info */}
+                <div className="p-4 rounded-xl bg-theme-elevated border border-[var(--glass-border-light)]">
+                  <div className="flex items-center gap-4">
+                    <img
+                      src="/logo.png"
+                      alt="ORI-RM Logo"
+                      className="w-12 h-12 rounded-xl"
+                      style={{
+                        boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
+                      }}
+                    />
+                    <div>
+                      <h3 className="text-sm font-bold text-theme-primary">ORI-RepoManager</h3>
+                      <p className="text-xs text-theme-muted">v{config?.version || '2.0.0'}</p>
+                      <p className="text-xs text-theme-muted">Alex Constantin Castu</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 p-5"
-               style={{ borderTop: '1px solid rgba(99, 163, 255, 0.15)' }}>
+          <div className="flex justify-end gap-3 p-5 border-t border-[var(--glass-border-light)]">
             <button
               onClick={closeSettingsModal}
               className="btn-secondary text-sm"
@@ -270,7 +295,7 @@ export function SettingsModal() {
               className="btn-primary flex items-center gap-2 text-sm"
             >
               {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
                 <Save className="w-4 h-4" />
               )}

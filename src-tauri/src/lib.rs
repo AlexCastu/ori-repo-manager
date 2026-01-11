@@ -5,6 +5,9 @@ use std::path::Path;
 use std::process::Command;
 use walkdir::WalkDir;
 
+mod git_advanced;
+use git_advanced::*;
+
 // ==================== TYPES ====================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +68,12 @@ pub struct AppSettings {
     pub show_favorites_first: bool,
     #[serde(rename = "autoScanOnStart")]
     pub auto_scan_on_start: bool,
+    #[serde(rename = "ideCommand", default = "default_ide_command")]
+    pub ide_command: String,
+}
+
+fn default_ide_command() -> String {
+    "code".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +113,7 @@ fn get_default_config() -> AppConfig {
             default_view: "grid".to_string(),
             show_favorites_first: true,
             auto_scan_on_start: true,
+            ide_command: "code".to_string(),
         },
     }
 }
@@ -242,18 +252,30 @@ async fn git_clone(repo_url: String, destination: String) -> Result<String, Stri
 
 #[tauri::command]
 async fn git_pull(project_path: String) -> Result<String, String> {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(&project_path)
-        .args(["pull"]);
-    apply_no_window(&mut cmd);
+    // First, fetch all branches from all remotes
+    let mut fetch_cmd = Command::new("git");
+    fetch_cmd.current_dir(&project_path)
+        .args(["fetch", "--all"]);
+    apply_no_window(&mut fetch_cmd);
 
-    let output = cmd.output()
+    let fetch_output = fetch_cmd.output()
+        .map_err(|e| format!("Failed to execute git fetch: {}", e))?;
+
+    // Then, pull the current branch
+    let mut pull_cmd = Command::new("git");
+    pull_cmd.current_dir(&project_path)
+        .args(["pull"]);
+    apply_no_window(&mut pull_cmd);
+
+    let pull_output = pull_cmd.output()
         .map_err(|e| format!("Failed to execute git pull: {}", e))?;
 
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    if pull_output.status.success() {
+        let fetch_msg = String::from_utf8_lossy(&fetch_output.stdout);
+        let pull_msg = String::from_utf8_lossy(&pull_output.stdout);
+        Ok(format!("Fetch: {}\n\nPull: {}", fetch_msg, pull_msg))
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(String::from_utf8_lossy(&pull_output.stderr).to_string())
     }
 }
 
@@ -321,6 +343,13 @@ async fn save_config(config: AppConfig) -> Result<(), String> {
         .map_err(|e| format!("Failed to write config: {}", e))?;
 
     Ok(())
+}
+
+// Get the config file path
+#[tauri::command]
+async fn get_config_file_path() -> Result<String, String> {
+    let path = get_config_path()?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 // Get global git configuration (user.name and user.email)
@@ -528,14 +557,12 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
 }
 
 #[tauri::command]
-async fn open_in_vscode(project_path: String) -> Result<(), String> {
-    // En Windows, usar Code.exe directamente para evitar ventanas CMD
+async fn open_in_ide(project_path: String, ide_command: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
 
-        // Primero intentar Code.exe directamente (sin cmd /c)
-        let mut cmd = Command::new("code");
+        let mut cmd = Command::new(&ide_command);
         cmd.arg(&project_path);
         cmd.creation_flags(CREATE_NO_WINDOW);
 
@@ -543,47 +570,114 @@ async fn open_in_vscode(project_path: String) -> Result<(), String> {
             return Ok(());
         }
 
-        // Intentar con la ruta típica de VS Code
-        let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
-        let vscode_path = format!("{}\\Programs\\Microsoft VS Code\\Code.exe", local_app_data);
+        // If the simple command failed, try specific paths for VS Code
+        if ide_command == "code" {
+            let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+            let vscode_path = format!("{}\\Programs\\Microsoft VS Code\\Code.exe", local_app_data);
 
-        if Path::new(&vscode_path).exists() {
-            let mut cmd = Command::new(&vscode_path);
-            cmd.arg(&project_path);
-            cmd.creation_flags(CREATE_NO_WINDOW);
-            cmd.spawn()
-                .map_err(|e| format!("Failed to open VS Code: {}", e))?;
-            return Ok(());
+            if Path::new(&vscode_path).exists() {
+                let mut cmd = Command::new(&vscode_path);
+                cmd.arg(&project_path);
+                cmd.creation_flags(CREATE_NO_WINDOW);
+                cmd.spawn()
+                    .map_err(|e| format!("Failed to open VS Code: {}", e))?;
+                return Ok(());
+            }
+
+            let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
+            let vscode_path_alt = format!("{}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe", user_profile);
+
+            if Path::new(&vscode_path_alt).exists() {
+                let mut cmd = Command::new(&vscode_path_alt);
+                cmd.arg(&project_path);
+                cmd.creation_flags(CREATE_NO_WINDOW);
+                cmd.spawn()
+                    .map_err(|e| format!("Failed to open VS Code: {}", e))?;
+                return Ok(());
+            }
         }
 
-        // Último recurso: user profile path
-        let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
-        let vscode_path_alt = format!("{}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe", user_profile);
-
-        if Path::new(&vscode_path_alt).exists() {
-            let mut cmd = Command::new(&vscode_path_alt);
-            cmd.arg(&project_path);
-            cmd.creation_flags(CREATE_NO_WINDOW);
-            cmd.spawn()
-                .map_err(|e| format!("Failed to open VS Code: {}", e))?;
-            return Ok(());
-        }
-
-        return Err("VS Code not found. Please ensure it's installed and in PATH.".to_string());
+        return Err(format!("IDE '{}' not found. Please ensure it's installed and in PATH.", ide_command));
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     {
-        Command::new("code")
+        // Try the command directly first
+        if let Ok(_) = Command::new(&ide_command).arg(&project_path).spawn() {
+            return Ok(());
+        }
+
+        // Try common paths for Sublime Text on macOS
+        if ide_command == "subl" {
+            let sublime_paths = vec![
+                "/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl",
+                "/usr/local/bin/subl",
+                "/opt/homebrew/bin/subl",
+            ];
+
+            for path in sublime_paths {
+                if Path::new(path).exists() {
+                    if let Ok(_) = Command::new(path).arg(&project_path).spawn() {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        // Try common paths for VS Code on macOS
+        if ide_command == "code" {
+            let vscode_paths = vec![
+                "/usr/local/bin/code",
+                "/opt/homebrew/bin/code",
+                "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+            ];
+
+            for path in vscode_paths {
+                if Path::new(path).exists() {
+                    if let Ok(_) = Command::new(path).arg(&project_path).spawn() {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        // Try common paths for Cursor on macOS
+        if ide_command == "cursor" {
+            let cursor_paths = vec![
+                "/usr/local/bin/cursor",
+                "/opt/homebrew/bin/cursor",
+            ];
+
+            for path in cursor_paths {
+                if Path::new(path).exists() {
+                    if let Ok(_) = Command::new(path).arg(&project_path).spawn() {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        return Err(format!("IDE '{}' not found. Please ensure it's installed and the command is in your PATH.", ide_command));
+    }
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        Command::new(&ide_command)
             .arg(&project_path)
             .spawn()
-            .map_err(|e| format!("Failed to open VS Code: {}", e))?;
+            .map_err(|e| format!("Failed to open IDE '{}': {}", ide_command, e))?;
 
         return Ok(());
     }
 
     #[allow(unreachable_code)]
     Ok(())
+}
+
+// Backward compatibility alias
+#[tauri::command]
+async fn open_in_vscode(project_path: String) -> Result<(), String> {
+    open_in_ide(project_path, "code".to_string()).await
 }
 
 #[tauri::command]
@@ -766,10 +860,26 @@ pub fn run() {
             pull_all_projects,
             load_config,
             save_config,
+            get_config_file_path,
+            open_in_ide,
             open_in_vscode,
             open_in_explorer,
             select_directory,
             check_path_exists,
+            // Advanced Git Commands
+            get_branches,
+            checkout_branch,
+            create_branch,
+            delete_branch,
+            get_commits,
+            get_stash_list,
+            stash_save,
+            stash_pop,
+            stash_drop,
+            get_file_changes,
+            get_diff,
+            batch_git_fetch,
+            batch_git_pull,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

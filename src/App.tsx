@@ -6,7 +6,12 @@ import {
   EnvironmentModal,
   GitConfigModal,
   FavoriteNoteModal,
-  ToastContainer
+  ToastContainer,
+  BatchActionsBar,
+  QuickSwitcher,
+  TagManager,
+  GitOperationsLog,
+  TitleBar
 } from './components';
 import { GitPullModal } from './components/GitPullModal';
 import { GitCloneModal } from './components/GitCloneModal';
@@ -15,9 +20,25 @@ import { GitVariablesModal } from './components/GitVariablesModal';
 import { DeleteEnvironmentModal } from './components/DeleteEnvironmentModal';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useStore } from './store/useStore';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useAutoSync } from './hooks/useAutoSync';
 
 function App() {
-  const { initialize, isInitialized } = useStore();
+  const {
+    initialize,
+    isInitialized,
+    selectedProjects,
+    tagManagerModal,
+    gitOperationsLogModal,
+    closeTagManagerModal,
+    closeGitOperationsLogModal
+  } = useStore();
+
+  // Keyboard shortcuts
+  const { showQuickSwitcher, setShowQuickSwitcher } = useKeyboardShortcuts();
+
+  // Auto-sync
+  useAutoSync();
 
   useEffect(() => {
     initialize();
@@ -38,7 +59,7 @@ function App() {
                     d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
             </svg>
           </div>
-          <p className="text-gray-400">Cargando...</p>
+          <p className="text-theme-muted">Cargando...</p>
         </motion.div>
       </div>
     );
@@ -47,6 +68,9 @@ function App() {
   return (
     <ThemeProvider>
       <div className="h-screen w-screen flex flex-col overflow-hidden gradient-mesh relative">
+        {/* Custom Title Bar */}
+        <TitleBar />
+
         {/* Main content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
@@ -67,6 +91,21 @@ function App() {
         <SettingsModal />
         <GitVariablesModal />
         <DeleteEnvironmentModal />
+
+        {/* New Components */}
+        {selectedProjects.size > 0 && <BatchActionsBar />}
+        <QuickSwitcher
+          isOpen={showQuickSwitcher}
+          onClose={() => setShowQuickSwitcher(false)}
+        />
+        <TagManager
+          isOpen={tagManagerModal.isOpen}
+          onClose={closeTagManagerModal}
+        />
+        <GitOperationsLog
+          isOpen={gitOperationsLogModal.isOpen}
+          onClose={closeGitOperationsLogModal}
+        />
 
         {/* Toasts */}
         <ToastContainer />

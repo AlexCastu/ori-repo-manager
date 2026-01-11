@@ -7,7 +7,7 @@ export function FavoriteNoteModal() {
   const {
     favoriteNoteModal,
     closeFavoriteNoteModal,
-    updateFavoriteNote,
+    updateProjectNote,
     addToast,
   } = useStore();
 
@@ -27,11 +27,11 @@ export function FavoriteNoteModal() {
 
     if (!data?.projectName) return;
 
-    updateFavoriteNote(data.projectName, note.trim());
+    updateProjectNote(data.projectName, note.trim());
     addToast({
       type: 'success',
       title: 'Nota guardada',
-      message: 'La nota del favorito ha sido actualizada',
+      message: note.trim() ? 'La nota ha sido guardada' : 'La nota ha sido eliminada',
     });
     closeFavoriteNoteModal();
   };
@@ -54,19 +54,18 @@ export function FavoriteNoteModal() {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md bg-dark-900 border border-white/10
-                       rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-md modal-base overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-white/5">
+            <div className="flex items-center justify-between p-6 border-b border-[var(--glass-border-light)]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-yellow-400/10
                                 flex items-center justify-center">
                   <MessageSquare className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">Nota del Favorito</h2>
-                  <p className="text-sm text-gray-500">{data?.projectName}</p>
+                  <h2 className="text-lg font-bold text-theme-primary">Nota del Proyecto</h2>
+                  <p className="text-sm text-theme-muted">{data?.projectName}</p>
                 </div>
               </div>
               <button
@@ -80,7 +79,7 @@ export function FavoriteNoteModal() {
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-theme-secondary mb-2">
                   Escribe una nota para recordar información importante
                 </label>
                 <textarea
@@ -94,7 +93,7 @@ export function FavoriteNoteModal() {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--glass-border-light)]">
                 <button
                   type="button"
                   onClick={closeFavoriteNoteModal}

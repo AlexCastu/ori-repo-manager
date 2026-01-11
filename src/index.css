@@ -4,7 +4,9 @@
 
 /* Custom base styles - Blue Glassmorphism Theme */
 @layer base {
-  :root {
+  /* Dark Mode (default) */
+  :root,
+  :root.dark {
     --background: 220 30% 8%;
     --foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
@@ -22,12 +24,57 @@
     --theme-bg-glow-2: rgba(59, 130, 246, 0.05);
     --theme-bg-glow-3: rgba(59, 130, 246, 0.25);
 
-    /* Glass effects */
+    /* Glass effects - Dark */
     --glass-card-bg: rgba(15, 31, 55, 0.8);
     --glass-sidebar-bg: rgba(10, 20, 33, 0.95);
     --glass-border: rgba(99, 163, 255, 0.3);
     --glass-border-light: rgba(99, 163, 255, 0.2);
     --glass-border-hover: rgba(99, 163, 255, 0.5);
+
+    /* Text colors */
+    --text-primary: #FFFFFF;
+    --text-secondary: #D1D5DB;
+    --text-muted: #9CA3AF;
+
+    /* Background base */
+    --bg-base: #1a1f2e;
+    --bg-elevated: rgba(15, 31, 55, 0.6);
+  }
+
+  /* Light Mode */
+  :root.light {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --border: 214.3 31.8% 91.4%;
+
+    /* Blue Glassmorphism Theme Colors */
+    --theme-primary: #2563EB;
+    --theme-secondary: #1D4ED8;
+    --theme-accent: #3B82F6;
+    --theme-success: #059669;
+    --theme-error: #DC2626;
+
+    /* Background gradients - Light */
+    --theme-bg-main: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #f8fafc 100%);
+    --theme-bg-glow-1: rgba(59, 130, 246, 0.08);
+    --theme-bg-glow-2: rgba(59, 130, 246, 0.04);
+    --theme-bg-glow-3: rgba(59, 130, 246, 0.12);
+
+    /* Glass effects - Light */
+    --glass-card-bg: rgba(255, 255, 255, 0.85);
+    --glass-sidebar-bg: rgba(248, 250, 252, 0.95);
+    --glass-border: rgba(59, 130, 246, 0.2);
+    --glass-border-light: rgba(59, 130, 246, 0.1);
+    --glass-border-hover: rgba(59, 130, 246, 0.3);
+
+    /* Text colors - Light */
+    --text-primary: #1F2937;
+    --text-secondary: #4B5563;
+    --text-muted: #6B7280;
+
+    /* Background base - Light */
+    --bg-base: #f8fafc;
+    --bg-elevated: rgba(255, 255, 255, 0.7);
   }
 
   * {
@@ -35,8 +82,9 @@
   }
 
   body {
-    @apply text-white antialiased;
-    background: #1a1f2e;
+    @apply antialiased;
+    color: var(--text-primary);
+    background: var(--bg-base);
     font-feature-settings: "rlig" 1, "calt" 1;
     margin: 0;
     min-height: 100vh;
@@ -49,7 +97,7 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: rgba(15, 31, 55, 0.5);
+    background: var(--bg-elevated);
     border-radius: 9999px;
   }
 
@@ -65,7 +113,7 @@
   /* Selection - Blue theme */
   ::selection {
     background: rgba(59, 130, 246, 0.4);
-    @apply text-white;
+    color: white;
   }
 }
 
@@ -73,58 +121,70 @@
 @layer components {
   /* Glass Card - Main content cards */
   .glass-card {
-    background: rgba(15, 31, 55, 0.8);
+    background: var(--glass-card-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(99, 163, 255, 0.3);
+    border: 1px solid var(--glass-border);
     box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
     @apply rounded-2xl;
   }
 
+  :root.light .glass-card {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  }
+
   .glass-card:hover {
-    border-color: rgba(99, 163, 255, 0.5);
+    border-color: var(--glass-border-hover);
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+  }
+
+  :root.light .glass-card:hover {
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
   }
 
   /* Glass Sidebar */
   .glass-sidebar {
-    background: rgba(10, 20, 33, 0.95);
+    background: var(--glass-sidebar-bg);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border-right: 1px solid rgba(99, 163, 255, 0.2);
+    border-right: 1px solid var(--glass-border-light);
   }
 
   /* Glass Panel - Bottom console */
   .glass-panel {
-    background: rgba(10, 20, 33, 0.9);
+    background: var(--glass-sidebar-bg);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(99, 163, 255, 0.2);
+    border-top: 1px solid var(--glass-border-light);
   }
 
   /* Glass Modal */
   .glass-modal {
-    background: rgba(15, 31, 55, 0.95);
+    background: var(--glass-card-bg);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(99, 163, 255, 0.3);
+    border: 1px solid var(--glass-border);
     box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
     @apply rounded-3xl;
   }
 
+  :root.light .glass-modal {
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+  }
+
   .glass {
-    background: rgba(15, 31, 55, 0.6);
+    background: var(--bg-elevated);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(99, 163, 255, 0.2);
+    border: 1px solid var(--glass-border-light);
     @apply rounded-2xl;
   }
 
   .glass-dark {
-    background: rgba(10, 20, 33, 0.8);
+    background: var(--glass-sidebar-bg);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(99, 163, 255, 0.15);
+    border: 1px solid var(--glass-border-light);
     @apply rounded-2xl;
   }
 
@@ -164,46 +224,47 @@
   /* Secondary Button - Glass */
   .btn-secondary {
     @apply px-4 py-2 font-medium rounded-2xl transition-all duration-200;
-    background: rgba(15, 31, 55, 0.6);
-    border: 1px solid rgba(99, 163, 255, 0.3);
-    color: #D1D5DB;
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
   }
 
   .btn-secondary:hover {
     background: rgba(59, 130, 246, 0.2);
-    border-color: rgba(99, 163, 255, 0.5);
-    color: #FFFFFF;
+    border-color: var(--glass-border-hover);
+    color: var(--text-primary);
   }
 
   .btn-ghost {
     @apply px-3 py-2 rounded-2xl transition-all duration-200;
-    color: #D1D5DB;
+    color: var(--text-secondary);
   }
 
   .btn-ghost:hover {
     background: rgba(59, 130, 246, 0.15);
-    color: #FFFFFF;
+    color: var(--text-primary);
   }
 
   .btn-icon {
     @apply p-2 rounded-xl transition-all duration-200;
-    color: #D1D5DB;
+    color: var(--text-secondary);
   }
 
   .btn-icon:hover {
     background: rgba(59, 130, 246, 0.2);
-    color: #FFFFFF;
+    color: var(--text-primary);
   }
 
   /* Input fields */
   .input-base {
-    @apply w-full px-4 py-2.5 rounded-2xl text-white transition-all duration-200;
-    background: rgba(15, 31, 55, 0.6);
-    border: 1px solid rgba(99, 163, 255, 0.2);
+    @apply w-full px-4 py-2.5 rounded-2xl transition-all duration-200;
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border-light);
   }
 
   .input-base::placeholder {
-    color: rgba(209, 213, 219, 0.5);
+    color: var(--text-muted);
   }
 
   .input-base:focus {
@@ -215,13 +276,13 @@
   /* Cards */
   .card {
     @apply p-4 rounded-2xl transition-all duration-300;
-    background: rgba(15, 31, 55, 0.6);
-    border: 1px solid rgba(99, 163, 255, 0.2);
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border-light);
   }
 
   .card:hover {
-    border-color: rgba(99, 163, 255, 0.4);
-    background: rgba(15, 31, 55, 0.8);
+    border-color: var(--glass-border);
+    background: var(--glass-card-bg);
   }
 
   .card-interactive {
@@ -233,22 +294,26 @@
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
   }
 
+  :root.light .card-interactive:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+
   /* Sidebar items */
   .sidebar-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200;
-    color: #D1D5DB;
+    color: var(--text-secondary);
   }
 
   .sidebar-item:hover {
     background: rgba(59, 130, 246, 0.15);
-    color: #FFFFFF;
+    color: var(--text-primary);
   }
 
   .sidebar-item-active {
     @apply sidebar-item;
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(29, 78, 216, 0.15));
     border-left: 3px solid #3B82F6;
-    color: #FFFFFF;
+    color: var(--text-primary);
   }
 
   /* Badges */
@@ -271,11 +336,23 @@
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
   }
 
+  :root.light .badge-success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
   .badge-warning {
     @apply badge;
     background: rgba(245, 158, 11, 0.3);
     color: #fcd34d;
     border: 1px solid rgba(245, 158, 11, 0.4);
+  }
+
+  :root.light .badge-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
   }
 
   .badge-error {
@@ -285,11 +362,209 @@
     border: 1px solid rgba(239, 68, 68, 0.4);
   }
 
+  :root.light .badge-error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
   .tooltip {
-    @apply absolute z-50 px-2 py-1 text-xs text-white rounded shadow-lg whitespace-nowrap animate-fade-in;
-    background: rgba(15, 31, 55, 0.95);
-    border: 1px solid rgba(99, 163, 255, 0.3);
+    @apply absolute z-50 px-2 py-1 text-xs rounded shadow-lg whitespace-nowrap animate-fade-in;
+    background: var(--glass-card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--glass-border);
     backdrop-filter: blur(8px);
+  }
+
+  /* Text color utilities */
+  .text-theme-primary {
+    color: var(--text-primary);
+  }
+
+  .text-theme-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-theme-muted {
+    color: var(--text-muted);
+  }
+
+  /* Background utilities */
+  .bg-theme-base {
+    background: var(--bg-base);
+  }
+
+  .bg-theme-elevated {
+    background: var(--bg-elevated);
+  }
+
+  .bg-theme-card {
+    background: var(--glass-card-bg);
+  }
+
+  /* Project card styles */
+  .project-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border-light);
+  }
+
+  .project-card:hover {
+    background: var(--glass-card-bg);
+    border-color: var(--glass-border);
+  }
+
+  .project-card.selected {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(99, 163, 255, 0.6);
+  }
+
+  :root.light .project-card.selected {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+
+  /* Modal base - for modals without glass effect */
+  .modal-base {
+    background: var(--glass-card-bg);
+    border: 1px solid var(--glass-border);
+    @apply rounded-2xl shadow-2xl;
+  }
+
+  :root.light .modal-base {
+    background: #ffffff;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Dark panel - used inside modals */
+  .panel-dark {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border-light);
+    @apply rounded-xl;
+  }
+
+  :root.light .panel-dark {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  /* Input dark variant */
+  .input-dark {
+    @apply px-3 py-2 rounded-lg text-sm transition-all;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border-light);
+    color: var(--text-primary);
+  }
+
+  :root.light .input-dark {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  .input-dark::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input-dark:focus {
+    outline: none;
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+
+  /* Stat card - small stat boxes */
+  .stat-card {
+    @apply p-4 rounded-xl text-center;
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border-light);
+  }
+
+  :root.light .stat-card {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  /* Category panel - expandable sections */
+  .category-panel {
+    @apply rounded-xl overflow-hidden;
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border-light);
+  }
+
+  :root.light .category-panel {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .category-panel-header {
+    @apply w-full flex items-center justify-between p-4 transition-colors;
+  }
+
+  .category-panel-header:hover {
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  /* Config item - settings items */
+  .config-item {
+    @apply p-3 rounded-lg;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border-light);
+  }
+
+  :root.light .config-item {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  /* Config button - selectable options */
+  .config-btn {
+    @apply px-3 py-2 text-xs rounded-lg transition-all font-medium border-2;
+    background: var(--bg-elevated);
+    border-color: var(--glass-border-light);
+    color: var(--text-muted);
+  }
+
+  .config-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--glass-border);
+    color: var(--text-primary);
+    transform: scale(1.02);
+  }
+
+  .config-btn.active {
+    background: linear-gradient(135deg, rgba(147, 51, 234, 0.4), rgba(147, 51, 234, 0.3));
+    border-color: #a855f7;
+    color: white;
+    box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3);
+    transform: scale(1.05);
+  }
+
+  :root.light .config-btn.active {
+    background: linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(147, 51, 234, 0.15));
+    color: #7c3aed;
+  }
+
+  /* Profile card */
+  .profile-card {
+    @apply p-4 rounded-xl transition-colors;
+    background: var(--bg-elevated);
+    border: 1px solid var(--glass-border-light);
+  }
+
+  .profile-card:hover {
+    border-color: var(--glass-border);
+  }
+
+  .profile-card.active {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.4);
+  }
+
+  :root.light .profile-card {
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  :root.light .profile-card.active {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
   }
 
   /* Console Panel Styles */
@@ -305,16 +580,32 @@
     color: #93c5fd;
   }
 
+  :root.light .console-line-info {
+    color: #2563eb;
+  }
+
   .console-line-success {
     color: #6ee7b7;
+  }
+
+  :root.light .console-line-success {
+    color: #059669;
   }
 
   .console-line-error {
     color: #fca5a5;
   }
 
+  :root.light .console-line-error {
+    color: #dc2626;
+  }
+
   .console-line-warning {
     color: #fcd34d;
+  }
+
+  :root.light .console-line-warning {
+    color: #b45309;
   }
 }
 
@@ -346,9 +637,24 @@
     background-image: linear-gradient(135deg, #3B82F6, #60a5fa);
   }
 
+  /* Header styles */
+  .app-header {
+    background: linear-gradient(180deg, rgba(30, 64, 175, 0.4) 0%, rgba(37, 99, 235, 0.2) 100%);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+  }
+
+  :root.light .app-header {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.05) 100%);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+  }
+
   /* Main app gradient mesh - Blue theme */
   .gradient-mesh {
     background: linear-gradient(135deg, #1e2a44 0%, #0f1a2b 50%, #0a1421 100%);
+  }
+
+  :root.light .gradient-mesh {
+    background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #f8fafc 100%);
   }
 
   .gradient-mesh::before {
@@ -358,7 +664,7 @@
     right: 0;
     width: 60%;
     height: 60%;
-    background: radial-gradient(ellipse at 100% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 100% 0%, var(--theme-bg-glow-1) 0%, transparent 70%);
     pointer-events: none;
   }
 
@@ -369,7 +675,7 @@
     left: 0;
     width: 50%;
     height: 50%;
-    background: radial-gradient(ellipse at 0% 100%, rgba(29, 78, 216, 0.1) 0%, transparent 60%);
+    background: radial-gradient(ellipse at 0% 100%, var(--theme-bg-glow-2) 0%, transparent 60%);
     pointer-events: none;
   }
 
@@ -410,5 +716,15 @@
     50% {
       box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
     }
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
   }
 }

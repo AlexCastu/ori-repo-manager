@@ -1,18 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Star,
   GitBranch,
-  ExternalLink,
   FolderOpen,
   Download,
   Upload,
-  Github,
-  Gitlab,
   Check,
   AlertCircle,
   RefreshCw,
-  MoreVertical,
   Settings,
   MessageSquare,
   Copy,
@@ -23,38 +19,74 @@ import { useStore } from '../store/useStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../utils/helpers';
 import { openInIDE, openInExplorer, getGitStatus, gitFetch } from '../utils/tauri';
+import { PlatformIcon } from './PlatformIcon';
+import { IdeIcon, getIdeLabel } from './IdeIcon';
 
 interface ProjectCardCompactProps {
   project: Project;
-  index: number;
 }
 
-export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) {
-  const {
-    favorites,
-    toggleFavorite,
-    openGitConfigModal,
-    openFavoriteNoteModal,
-    openGitPullModal,
-    addToast
-  } = useStore();
-  const { colors } = useTheme();
-  const [showMenu, setShowMenu] = useState(false);
+// Memoized component to prevent unnecessary re-renders
+export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: ProjectCardCompactProps) {
+  // Use specific selectors to minimize re-renders
+  const favorites = useStore((state) => state.favorites);
+  const projectNotes = useStore((state) => state.projectNotes);
+  const selectedProjects = useStore((state) => state.selectedProjects);
+  const refreshTrigger = useStore((state) => state.refreshTrigger);
+  const config = useStore((state) => state.config);
+  const toggleFavorite = useStore((state) => state.toggleFavorite);
+  const openGitConfigModal = useStore((state) => state.openGitConfigModal);
+  const openFavoriteNoteModal = useStore((state) => state.openFavoriteNoteModal);
+  const openGitPullModal = useStore((state) => state.openGitPullModal);
+  const addToast = useStore((state) => state.addToast);
+  const toggleProjectSelection = useStore((state) => state.toggleProjectSelection);
+
+  const { isDark } = useTheme();
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
-  const [isLoadingStatus, setIsLoadingStatus] = useState(false);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
   const isFavorite = !!favorites[project.name];
-  const favoriteNote = favorites[project.name]?.note || '';
+  const projectNote = projectNotes[project.name] || '';
+  const hasNote = !!projectNote;
+  const isSelected = selectedProjects.has(project.path);
+  const ideCommand = config?.settings?.ideCommand || 'code';
 
-  // Load git status on mount (without fetch for speed)
+  // Load git status on mount, when project changes, or when refreshTrigger changes
   useEffect(() => {
-    if (project.hasGit) {
-      loadGitStatus(false);
-    }
-  }, [project.path]);
+    let isMounted = true;
+
+    const loadStatus = async () => {
+      if (!project.hasGit) {
+        if (isMounted) setIsLoadingStatus(false);
+        return;
+      }
+
+      if (isMounted) {
+        setIsLoadingStatus(true);
+        try {
+          const status = await getGitStatus(project.path);
+          if (isMounted) {
+            setGitStatus(status);
+          }
+        } catch (error) {
+          console.error('Failed to get git status:', error);
+        } finally {
+          if (isMounted) {
+            setIsLoadingStatus(false);
+          }
+        }
+      }
+    };
+
+    loadStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [project.path, project.hasGit, refreshTrigger]);
 
   const loadGitStatus = async (withFetch: boolean = false) => {
-    if (!project.hasGit || isLoadingStatus) return;
+    if (!project.hasGit) return;
     setIsLoadingStatus(true);
     try {
       if (withFetch) {
@@ -75,12 +107,12 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
 
   const handleOpenIDE = async () => {
     try {
-      await openInIDE(project.path);
+      await openInIDE(project.path, ideCommand);
     } catch (error) {
       addToast({
         type: 'error',
         title: 'Error',
-        message: 'No se pudo abrir el IDE',
+        message: `No se pudo abrir ${getIdeLabel(ideCommand)}`,
       });
     }
   };
@@ -123,14 +155,6 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
     });
   };
 
-  const getPlatformIcon = () => {
-    switch (project.platform) {
-      case 'github': return <Github className="w-3.5 h-3.5" />;
-      case 'gitlab': return <Gitlab className="w-3.5 h-3.5" />;
-      default: return <GitBranch className="w-3.5 h-3.5" />;
-    }
-  };
-
   // Git status indicators
   const hasCommitsToPush = gitStatus && gitStatus.ahead > 0;
   const hasCommitsToPull = gitStatus && gitStatus.behind > 0;
@@ -138,198 +162,188 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
   const isUpToDate = gitStatus && !hasCommitsToPush && !hasCommitsToPull && !hasUncommittedChanges;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.02, duration: 0.2 }}
-      className="group relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200"
-      style={{
-        background: 'rgba(15, 31, 55, 0.6)',
-        border: '1px solid rgba(99, 163, 255, 0.2)'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(15, 31, 55, 0.8)';
-        e.currentTarget.style.borderColor = 'rgba(99, 163, 255, 0.4)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'rgba(15, 31, 55, 0.6)';
-        e.currentTarget.style.borderColor = 'rgba(99, 163, 255, 0.2)';
-        setShowMenu(false);
-      }}
+    <div
+      className={cn(
+        'group relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 project-card',
+        isSelected && 'selected'
+      )}
     >
+      {/* Checkbox for Selection */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleProjectSelection(project.path);
+        }}
+        className="flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+        style={{
+          borderColor: isSelected ? '#3B82F6' : '#D1D5DB',
+          backgroundColor: isSelected ? '#3B82F6' : 'transparent',
+        }}
+      >
+        {isSelected && (
+          <motion.svg
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="w-3 h-3 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </motion.svg>
+        )}
+      </button>
+
       {/* Favorite Button */}
       <button
         onClick={() => toggleFavorite(project.name)}
         className={cn(
           'p-1 rounded-xl transition-all duration-200 flex-shrink-0',
           isFavorite
-            ? ''
-            : 'opacity-0 group-hover:opacity-100'
+            ? 'text-amber-500 dark:text-amber-400'
+            : 'opacity-0 group-hover:opacity-100 text-theme-secondary'
         )}
-        style={{ color: isFavorite ? '#fcd34d' : '#D1D5DB' }}
       >
         <Star className={cn('w-4 h-4', isFavorite && 'fill-current')} />
       </button>
 
       {/* Platform Icon */}
-      <div className="flex-shrink-0" style={{ color: '#3B82F6' }}>
-        {getPlatformIcon()}
+      <div className="flex-shrink-0 text-theme-primary">
+        <PlatformIcon platform={project.platform} size={16} />
       </div>
 
       {/* Project Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-white truncate">
+          <h3 className="text-sm font-medium text-theme-primary truncate">
             {project.name}
           </h3>
           {gitStatus?.branch && (
-            <span className="text-xs hidden sm:flex items-center gap-1 flex-shrink-0" style={{ color: '#D1D5DB' }}>
+            <span className="text-xs hidden sm:flex items-center gap-1 flex-shrink-0 text-theme-secondary">
               <GitBranch className="w-3 h-3" />
               {gitStatus.branch}
+            </span>
+          )}
+          {projectNote && (
+            <span
+              className="text-xs hidden sm:flex items-center gap-1 flex-shrink-0 text-theme-secondary"
+              title={projectNote}
+            >
+              <MessageSquare className="w-3 h-3" />
             </span>
           )}
         </div>
         {project.gitUrl && (
           <div className="flex items-center gap-1 mt-0.5 group/url">
             <LinkIcon className="w-3 h-3 flex-shrink-0" style={{ color: '#3B82F6' }} />
-            <span className="text-xs truncate flex-1" style={{ color: '#63A3FF' }}>
+            <span className="text-xs truncate flex-1" style={{ color: '#3B82F6' }}>
               {project.gitUrl}
             </span>
             <button
               onClick={handleCopyUrl}
-              className="opacity-0 group-hover/url:opacity-100 p-1 rounded transition-all duration-200"
-              style={{ color: '#D1D5DB' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                e.currentTarget.style.color = '#FFFFFF';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = '#D1D5DB';
-              }}
+              className="opacity-0 group-hover/url:opacity-100 p-1 rounded transition-all duration-200 text-theme-secondary hover:text-theme-primary hover:bg-[rgba(59,130,246,0.2)]"
               title="Copiar URL"
             >
               <Copy className="w-3 h-3" />
             </button>
           </div>
         )}
-        {favoriteNote && (
-          <p className="text-xs truncate mt-0.5" style={{ color: '#D1D5DB' }}>
-            <MessageSquare className="w-3 h-3 inline mr-1" />
-            {favoriteNote}
-          </p>
-        )}
       </div>
 
-      {/* Status Badges */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        {isLoadingStatus ? (
-          <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ color: '#3B82F6' }} />
+      {/* Status Badges - Fixed width container to prevent layout shift */}
+      <div className="flex items-center gap-2 flex-shrink-0 min-w-[32px] justify-end">
+        {isLoadingStatus && project.hasGit ? (
+          <span
+            className="w-7 h-7 rounded-full flex items-center justify-center transition-opacity duration-300"
+            style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)' }}
+          >
+            <RefreshCw className="w-4 h-4 animate-spin" style={{ color: '#3B82F6' }} />
+          </span>
         ) : (
-          <>
+          <div className="flex items-center gap-2 transition-opacity duration-300">
             {isUpToDate && (
               <span
-                className="w-6 h-6 rounded-full flex items-center justify-center"
+                className="w-7 h-7 rounded-full flex items-center justify-center"
                 style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                  boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)'
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.2)',
+                  boxShadow: '0 0 12px rgba(16, 185, 129, 0.4)'
                 }}
                 title="Actualizado"
               >
-                <Check className="w-3.5 h-3.5" style={{ color: '#10B981' }} />
+                <Check className="w-4 h-4" style={{ color: isDark ? '#34d399' : '#059669' }} />
               </span>
             )}
             {hasUncommittedChanges && (
               <span
-                className="px-2 py-0.5 text-xs rounded-full flex items-center gap-1"
+                className="px-2.5 py-1 text-xs font-semibold rounded-full flex items-center gap-1.5"
                 style={{
-                  backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                  color: '#fcd34d',
-                  border: '1px solid rgba(245, 158, 11, 0.3)'
+                  backgroundColor: isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
+                  color: isDark ? '#fcd34d' : '#b45309',
+                  border: `1px solid ${isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(245, 158, 11, 0.6)'}`
                 }}
                 title="Cambios sin commitear"
               >
-                <AlertCircle className="w-3 h-3" />
+                <AlertCircle className="w-3.5 h-3.5" />
               </span>
             )}
             {hasCommitsToPush && (
               <span
-                className="px-2 py-0.5 text-xs rounded-full flex items-center gap-1"
+                className="px-2.5 py-1 text-xs font-semibold rounded-full flex items-center gap-1.5"
                 style={{
-                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                  color: '#93c5fd',
-                  border: '1px solid rgba(59, 130, 246, 0.3)'
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)',
+                  color: isDark ? '#93c5fd' : '#1d4ed8',
+                  border: `1px solid ${isDark ? 'rgba(59, 130, 246, 0.5)' : 'rgba(59, 130, 246, 0.6)'}`
                 }}
                 title={`${gitStatus!.ahead} commits para subir`}
               >
-                <Upload className="w-3 h-3" />
+                <Upload className="w-3.5 h-3.5" />
                 <span>{gitStatus!.ahead}</span>
               </span>
             )}
             {hasCommitsToPull && (
               <span
-                className="px-2 py-0.5 text-xs rounded-full flex items-center gap-1"
+                className="px-2.5 py-1 text-xs font-semibold rounded-full flex items-center gap-1.5"
                 style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                  color: '#6ee7b7',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  boxShadow: '0 0 8px rgba(16, 185, 129, 0.3)'
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
+                  color: isDark ? '#6ee7b7' : '#047857',
+                  border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.6)'}`
                 }}
                 title={`${gitStatus!.behind} commits para descargar`}
               >
-                <Download className="w-3 h-3" />
+                <Download className="w-3.5 h-3.5" />
                 <span>{gitStatus!.behind}</span>
               </span>
             )}
             {!project.hasGit && (
               <span
-                className="px-2 py-0.5 text-xs rounded-full"
+                className="px-2.5 py-1 text-xs font-medium rounded-full text-theme-secondary"
                 style={{
-                  backgroundColor: 'rgba(99, 163, 255, 0.1)',
-                  color: '#D1D5DB',
-                  border: '1px solid rgba(99, 163, 255, 0.2)'
+                  backgroundColor: 'var(--bg-elevated)',
+                  border: '1px solid var(--glass-border-light)'
                 }}
               >
                 No Git
               </span>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* Action Buttons - Right Side */}
-      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        {/* IDE */}
-        <button
-          onClick={handleOpenIDE}
-          className="p-2 rounded-xl transition-colors"
-          style={{ color: '#D1D5DB' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-            e.currentTarget.style.color = '#FFFFFF';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = '#D1D5DB';
-          }}
-          title="Abrir en IDE"
-        >
-          <ExternalLink className="w-4 h-4" />
-        </button>
+      {/* IDE Button - Always visible */}
+      <button
+        onClick={handleOpenIDE}
+        className="flex-shrink-0 p-2 rounded-xl transition-all duration-200 hover:bg-[rgba(59,130,246,0.2)] text-theme-secondary hover:text-theme-primary"
+        title={`Abrir en ${getIdeLabel(ideCommand)}`}
+      >
+        <IdeIcon ide={ideCommand} size={18} />
+      </button>
 
+      {/* Action Buttons - Visible on hover */}
+      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         {/* Folder */}
         <button
           onClick={handleOpenExplorer}
-          className="p-2 rounded-xl transition-colors"
-          style={{ color: '#D1D5DB' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-            e.currentTarget.style.color = '#FFFFFF';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = '#D1D5DB';
-          }}
+          className="btn-icon"
           title="Abrir carpeta"
         >
           <FolderOpen className="w-4 h-4" />
@@ -339,17 +353,9 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
         {project.hasGit && (
           <button
             onClick={handlePull}
-            className="p-2 rounded-xl transition-colors"
+            className="btn-icon"
             style={{
-              color: hasCommitsToPull ? '#10B981' : '#D1D5DB'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = hasCommitsToPull
-                ? 'rgba(16, 185, 129, 0.2)'
-                : 'rgba(59, 130, 246, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              color: hasCommitsToPull ? '#10B981' : undefined
             }}
             title="Git Pull"
           >
@@ -357,108 +363,49 @@ export function ProjectCardCompact({ project, index }: ProjectCardCompactProps) 
           </button>
         )}
 
-        {/* More Menu */}
-        <div className="relative">
+        {/* Git Config */}
+        {project.hasGit && (
           <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="p-2 rounded-xl transition-colors"
-            style={{ color: '#D1D5DB' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-              e.currentTarget.style.color = '#FFFFFF';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = '#D1D5DB';
-            }}
+            onClick={() => openGitConfigModal({
+              projectPath: project.path,
+              projectName: project.name,
+            })}
+            className="btn-icon"
+            title="Git Config"
           >
-            <MoreVertical className="w-4 h-4" />
+            <Settings className="w-4 h-4" />
           </button>
+        )}
 
-          {showMenu && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="absolute right-0 top-10 w-44 rounded-2xl shadow-xl overflow-hidden z-50"
-              style={{
-                background: 'rgba(15, 31, 55, 0.95)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(99, 163, 255, 0.3)'
-              }}
-            >
-              {project.hasGit && (
-                <>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      openGitConfigModal({
-                        projectPath: project.path,
-                        projectName: project.name,
-                      });
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-                    style={{ color: '#D1D5DB' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                      e.currentTarget.style.color = '#FFFFFF';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#D1D5DB';
-                    }}
-                  >
-                    <Settings className="w-4 h-4" />
-                    Git Config
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      loadGitStatus(true);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-                    style={{ color: '#D1D5DB' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                      e.currentTarget.style.color = '#FFFFFF';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#D1D5DB';
-                    }}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Actualizar
-                  </button>
-                </>
-              )}
-              {isFavorite && (
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    openFavoriteNoteModal({
-                      projectName: project.name,
-                      currentNote: favoriteNote,
-                    });
-                  }}
-                  className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors"
-                  style={{ color: '#D1D5DB' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                    e.currentTarget.style.color = '#FFFFFF';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#D1D5DB';
-                  }}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  Editar Nota
-                </button>
-              )}
-            </motion.div>
+        {/* Refresh */}
+        {/* {project.hasGit && (
+          <button
+            onClick={() => loadGitStatus(true)}
+            className="btn-icon"
+            title="Actualizar estado"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )} */}
+
+        {/* Edit Note - Available for all projects */}
+        <button
+          onClick={() => openFavoriteNoteModal({
+            projectName: project.name,
+            currentNote: projectNote,
+          })}
+          className={cn(
+            "btn-icon relative",
+            hasNote && "text-yellow-400"
           )}
-        </div>
+          title={projectNote ? "Editar nota" : "Agregar nota"}
+        >
+          <MessageSquare className="w-4 h-4" />
+          {hasNote && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-yellow-400 rounded-full" />
+          )}
+        </button>
       </div>
-    </motion.div>
+    </div>
   );
-}
+});

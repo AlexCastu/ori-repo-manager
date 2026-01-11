@@ -1,11 +1,12 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus,
   Folder,
-  Settings,
   RefreshCw,
   Edit3,
   ChevronRight,
+  ChevronLeft,
   GitBranch,
   FolderOpen,
   GitPullRequest,
@@ -28,7 +29,7 @@ import { environmentColors, defaultEnvironmentColor, defaultEnvironmentIcon } fr
 import type { EnvironmentIcon } from '../types';
 
 // Map icon names to components
-const iconComponents: Record<EnvironmentIcon, React.ComponentType<{ className?: string }>> = {
+const iconComponents: Record<EnvironmentIcon, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   'folder': Folder,
   'code': Code,
   'server': Server,
@@ -44,18 +45,27 @@ const iconComponents: Record<EnvironmentIcon, React.ComponentType<{ className?: 
 };
 
 export function Sidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+
   const environments = useEnvironments();
   const activeEnvironment = useActiveEnvironment();
   const {
     setActiveEnvironment,
     openEnvironmentModal,
     openCloneModal,
-    openSettingsModal,
     openGitVariablesModal,
     scanCurrentEnvironment,
+    triggerRefresh,
     isLoading,
     addToast
   } = useStore();
+
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
 
   const handleOpenFolder = async (basePath: string) => {
     try {
@@ -69,59 +79,87 @@ export function Sidebar() {
     }
   };
 
+  const handleScanAndUpdate = async () => {
+    if (isLoading) return;
+
+    await scanCurrentEnvironment(true);
+
+    const { projects } = useStore.getState();
+
+    if (projects.length === 0) {
+      addToast({
+        type: 'warning',
+        title: 'Sin proyectos',
+        message: 'No se encontraron repositorios en este entorno',
+      });
+      return;
+    }
+
+    triggerRefresh();
+
+    addToast({
+      type: 'success',
+      title: 'Actualización completada',
+      message: `${projects.length} proyectos actualizados`,
+    });
+  };
+
   return (
     <motion.aside
       initial={{ x: -20, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      className="w-72 h-full glass-sidebar flex flex-col overflow-hidden"
+      animate={{
+        x: 0,
+        opacity: 1,
+        width: isCollapsed ? '64px' : '288px'
+      }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="h-full glass-sidebar flex flex-col relative overflow-hidden scrollbar-hide"
     >
-      {/* Header / Logo */}
-      <div className="p-6 border-b" style={{ borderColor: 'rgba(99, 163, 255, 0.15)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-               style={{
-                 background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)',
-                 boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
-               }}>
-            <GitBranch className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white">ORI-RepoManager</h1>
-            <p className="text-xs" style={{ color: '#D1D5DB' }}>v2.0 • Alex C.C.</p>
-          </div>
-        </div>
-      </div>
+      {/* Top controls: toggle + new environment button */}
+      <div className={isCollapsed ? 'p-3 pt-6 pb-5' : 'p-4 pt-6 pb-5'}>
+        <div className={isCollapsed ? 'flex flex-col items-center gap-3' : 'flex items-center gap-3'}>
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-lg border border-[var(--glass-border-light)] bg-[var(--bg-elevated)]/95 backdrop-blur hover:translate-x-0.5 hover:shadow-xl"
+            style={{ color: '#3B82F6' }}
+            title={isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+          >
+            {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          </button>
 
-      {/* New Environment Button */}
-      <div className="p-4">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => openEnvironmentModal({ mode: 'create' })}
-          className="w-full btn-primary flex items-center justify-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo Entorno</span>
-        </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => openEnvironmentModal({ mode: 'create' })}
+            className={`btn-primary flex items-center justify-center gap-2 ${isCollapsed ? 'p-2 h-10 w-10 rounded-xl' : 'w-full h-10'}`}
+            title={isCollapsed ? 'Nuevo Entorno' : undefined}
+          >
+            <Plus className={isCollapsed ? "w-6 h-6" : "w-4 h-4"} />
+            {!isCollapsed && <span>Nuevo Entorno</span>}
+          </motion.button>
+        </div>
       </div>
 
       {/* Environments List */}
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        <div className="text-xs font-medium uppercase tracking-wider px-3 mb-2"
-             style={{ color: '#D1D5DB' }}>
-          Entornos
-        </div>
+      <div className="flex-1 overflow-y-auto py-2 scrollbar-hide" style={{ paddingLeft: isCollapsed ? '8px' : '12px', paddingRight: isCollapsed ? '8px' : '12px' }}>
+        {!isCollapsed && (
+          <div className="text-xs font-medium uppercase tracking-wider px-3 mb-2 text-theme-secondary">
+            Entornos
+          </div>
+        )}
 
         {environments.length === 0 ? (
-          <div className="px-3 py-8 text-center">
-            <Folder className="w-10 h-10 mx-auto mb-3" style={{ color: '#3B82F6' }} />
-            <p className="text-sm text-white">
-              No hay entornos configurados
-            </p>
-            <p className="text-xs mt-1" style={{ color: '#D1D5DB' }}>
-              Crea uno para empezar
-            </p>
-          </div>
+          !isCollapsed && (
+            <div className="px-3 py-8 text-center">
+              <Folder className="w-10 h-10 mx-auto mb-3" style={{ color: '#3B82F6' }} />
+              <p className="text-sm text-theme-primary">
+                No hay entornos configurados
+              </p>
+              <p className="text-xs mt-1 text-theme-secondary">
+                Crea uno para empezar
+              </p>
+            </div>
+          )
         ) : (
           <div className="space-y-1">
             {environments.map((env, index) => (
@@ -130,15 +168,18 @@ export function Sidebar() {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
+                className="relative group"
               >
                 <button
                   onClick={() => setActiveEnvironment(env.id)}
                   className={cn(
-                    'w-full group',
+                    'w-full transition-all',
                     activeEnvironment?.id === env.id
                       ? 'sidebar-item-active'
-                      : 'sidebar-item'
+                      : 'sidebar-item',
+                    isCollapsed ? 'justify-center p-2' : ''
                   )}
+                  title={isCollapsed ? `${env.name}${activeEnvironment?.id === env.id ? ' (Activo)' : ''}` : undefined}
                 >
                   {(() => {
                     const iconName = env.icon || defaultEnvironmentIcon;
@@ -148,35 +189,44 @@ export function Sidebar() {
                     const isActive = activeEnvironment?.id === env.id;
                     const isGradient = colorData.gradient.startsWith('linear-gradient');
 
+                    const backgroundStyle = isGradient
+                      ? { background: colorData.gradient, opacity: isActive ? 1 : 0.45 }
+                      : { backgroundColor: colorData.primary, opacity: isActive ? 1 : 0.45 };
+
                     return (
                       <div
                         className={cn(
-                          'w-7 h-7 rounded-xl flex items-center justify-center transition-all',
-                          isActive ? '' : 'bg-white/10'
+                          'rounded-xl flex items-center justify-center transition-all ring-1 ring-white/10',
+                          isCollapsed ? 'w-8 h-8' : 'w-7 h-7'
                         )}
-                        style={
-                          isActive
-                            ? isGradient
-                              ? { background: colorData.gradient }
-                              : { backgroundColor: colorData.primary }
-                            : undefined
-                        }
+                        style={backgroundStyle}
                       >
-                        <IconComponent className="w-4 h-4 text-white" />
+                        <IconComponent className={isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} style={{ color: isActive ? 'white' : 'var(--text-primary)' }} />
                       </div>
                     );
                   })()}
-                  <span className="flex-1 text-left truncate">{env.name}</span>
-                  <ChevronRight className={cn(
-                    'w-4 h-4 transition-all',
-                    activeEnvironment?.id === env.id
-                      ? 'rotate-90 text-white'
-                      : 'opacity-0 group-hover:opacity-100'
-                  )} style={{ color: activeEnvironment?.id !== env.id ? '#D1D5DB' : undefined }} />
+                  {!isCollapsed && (
+                    <>
+                      <span className="flex-1 text-left truncate" title={env.name}>{env.name}</span>
+                      <ChevronRight className={cn(
+                        'w-4 h-4 transition-all',
+                        activeEnvironment?.id === env.id
+                          ? 'rotate-90 text-theme-primary'
+                          : 'opacity-0 group-hover:opacity-100 text-theme-secondary'
+                      )} />
+                    </>
+                  )}
                 </button>
 
+                {/* Tooltip for collapsed mode */}
+                {isCollapsed && (
+                  <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 rounded-md text-xs bg-[var(--bg-elevated)] border border-[var(--glass-border-light)] shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    {env.name}
+                  </div>
+                )}
+
                 {/* Environment Actions - show on active */}
-                {activeEnvironment?.id === env.id && (
+                {activeEnvironment?.id === env.id && !isCollapsed && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -187,11 +237,11 @@ export function Sidebar() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          scanCurrentEnvironment();
+                          handleScanAndUpdate();
                         }}
                         disabled={isLoading}
                         className="btn-icon"
-                        title="Rescanear proyectos"
+                        title="Buscar y actualizar todos los repositorios"
                       >
                         <RefreshCw className={cn(
                           'w-4 h-4',
@@ -249,21 +299,14 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Footer / Settings */}
-      <div className="p-4 space-y-1" style={{ borderTop: '1px solid rgba(99, 163, 255, 0.15)' }}>
+      <div className={isCollapsed ? 'p-2 border-t border-[var(--glass-border-light)]' : 'p-4 border-t border-[var(--glass-border-light)]'}>
         <button
           onClick={() => openGitVariablesModal()}
-          className="sidebar-item w-full"
+          className={`sidebar-item w-full ${isCollapsed ? 'justify-center p-2' : ''}`}
+          title={isCollapsed ? 'Variables Git' : undefined}
         >
           <Settings2 className="w-5 h-5" />
-          <span>Variables Git</span>
-        </button>
-        <button
-          onClick={() => openSettingsModal()}
-          className="sidebar-item w-full"
-        >
-          <Settings className="w-5 h-5" />
-          <span>Configuración</span>
+          {!isCollapsed && <span>Variables Git</span>}
         </button>
       </div>
     </motion.aside>

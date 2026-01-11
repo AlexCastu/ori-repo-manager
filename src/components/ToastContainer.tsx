@@ -54,19 +54,12 @@ function Toast({ toast }: { toast: ToastMessage }) {
     >
       <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: style.icon }} />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-white">{toast.title}</p>
-        <p className="text-sm mt-0.5" style={{ color: '#D1D5DB' }}>{toast.message}</p>
+        <p className="font-medium text-theme-primary">{toast.title}</p>
+        <p className="text-sm mt-0.5 text-theme-secondary">{toast.message}</p>
       </div>
       <button
         onClick={() => removeToast(toast.id)}
-        className="flex-shrink-0 p-1 rounded-lg transition-colors"
-        style={{ color: '#D1D5DB' }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
-        }}
+        className="btn-icon flex-shrink-0 p-1"
       >
         <X className="w-4 h-4" />
       </button>
