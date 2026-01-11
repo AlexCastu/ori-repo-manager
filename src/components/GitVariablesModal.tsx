@@ -11,6 +11,7 @@ import {
   listGitConfig,
   setGitConfigValue,
   unsetGitConfigValue,
+  cleanProxyConfig,
   type GitConfigEntry
 } from '../utils/tauri';
 
@@ -529,8 +530,23 @@ export function GitVariablesModal() {
       if (activeProfileId && activeProfileId !== profile.id) {
         const previousProfile = profiles.find(p => p.id === activeProfileId);
         if (previousProfile) {
+          // Limpiar las variables del perfil anterior
           for (const variable of previousProfile.variables) {
             await unsetGitConfigValue(variable.key);
+          }
+          
+          // Si el perfil anterior tenía variables de proxy, limpiarlas completamente
+          const hadProxyVars = previousProfile.variables.some(v => 
+            v.key.toLowerCase().includes('proxy') || 
+            v.key.toLowerCase().includes('http.')
+          );
+          
+          if (hadProxyVars) {
+            try {
+              await cleanProxyConfig();
+            } catch (e) {
+              console.warn('Error limpiando proxy config:', e);
+            }
           }
         }
       }
@@ -576,15 +592,50 @@ export function GitVariablesModal() {
         if (failures > 0) {
           console.warn(`${failures} variables no se pudieron eliminar`);
         }
+
+        // Siempre limpiar las variables de proxy conocidas como medida de seguridad
+        // Esto asegura que no queden proxies huérfanos que causen errores de conexión
+        const hasProxyVars = activeProfile.variables.some(v => 
+          v.key.toLowerCase().includes('proxy') || 
+          v.key.toLowerCase().includes('ssl') ||
+          v.key.toLowerCase().includes('http.')
+        );
+        
+        if (hasProxyVars) {
+          try {
+            const cleanedKeys = await cleanProxyConfig();
+            if (cleanedKeys.length > 0) {
+              console.log('Variables de proxy limpiadas adicionales:', cleanedKeys);
+            }
+          } catch (proxyError) {
+            console.warn('Error limpiando variables de proxy:', proxyError);
+          }
+        }
       }
 
       saveActiveProfileId(null);
+      
+      // Verificar que las variables realmente se eliminaron
+      await loadConfig();
+      
+      // Verificar específicamente el proxy
+      const currentConfig = await listGitConfig();
+      const remainingProxy = currentConfig.filter(e => 
+        e.key === 'http.proxy' || e.key === 'https.proxy'
+      );
+      
+      if (remainingProxy.length > 0) {
+        // Intentar limpiar de nuevo
+        console.warn('Aún quedan variables de proxy, intentando limpiar de nuevo...');
+        await cleanProxyConfig();
+        await loadConfig();
+      }
+      
       addToast({
         type: 'success',
         title: 'Perfil desactivado',
         message: 'Todas las variables del perfil han sido eliminadas',
       });
-      await loadConfig();
     } catch (error) {
       console.error('Error deactivating profile:', error);
       addToast({
@@ -864,15 +915,49 @@ export function GitVariablesModal() {
                       )}
                     </div>
                   </div>
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-                    isProxyActive
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-gray-500/20 text-theme-muted'
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full ${
-                      isProxyActive ? 'bg-green-400 animate-pulse' : 'bg-gray-500'
-                    }`} />
-                    {isProxyActive ? 'Activo' : 'Inactivo'}
+                  <div className="flex items-center gap-2">
+                    {isProxyActive && (
+                      <button
+                        onClick={async () => {
+                          setIsSaving(true);
+                          try {
+                            const cleaned = await cleanProxyConfig();
+                            await loadConfig();
+                            addToast({
+                              type: 'success',
+                              title: 'Proxy limpiado',
+                              message: cleaned.length > 0 
+                                ? `Se eliminaron ${cleaned.length} configuraciones de proxy`
+                                : 'No había configuraciones de proxy',
+                            });
+                          } catch (error) {
+                            console.error('Error cleaning proxy:', error);
+                            addToast({
+                              type: 'error',
+                              title: 'Error',
+                              message: 'No se pudo limpiar el proxy',
+                            });
+                          } finally {
+                            setIsSaving(false);
+                          }
+                        }}
+                        disabled={isSaving}
+                        className="px-2 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs transition-colors"
+                        title="Limpiar todas las configuraciones de proxy"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+                      isProxyActive
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-gray-500/20 text-theme-muted'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${
+                        isProxyActive ? 'bg-green-400 animate-pulse' : 'bg-gray-500'
+                      }`} />
+                      {isProxyActive ? 'Activo' : 'Inactivo'}
+                    </div>
                   </div>
                 </div>
 

@@ -434,25 +434,95 @@ async fn set_git_config_value(key: String, value: String) -> Result<(), String> 
     Ok(())
 }
 
-// Unset (remove) a git config value
+// Unset (remove) a git config value - uses --unset-all to remove all instances
 #[tauri::command]
 async fn unset_git_config_value(key: String) -> Result<(), String> {
     let mut cmd = Command::new("git");
-    cmd.args(["config", "--global", "--unset", &key]);
+    // Use --unset-all to ensure ALL instances of this key are removed
+    cmd.args(["config", "--global", "--unset-all", &key]);
     apply_no_window(&mut cmd);
 
     let output = cmd.output()
         .map_err(|e| format!("Failed to unset git config {}: {}", key, e))?;
 
-    // Don't error if key doesn't exist
+    // Don't error if key doesn't exist (exit code 5)
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if !stderr.contains("No such") {
+        // Exit code 5 means key doesn't exist, which is fine
+        if output.status.code() != Some(5) && !stderr.is_empty() {
             return Err(format!("Failed to unset {}: {}", key, stderr));
         }
     }
 
     Ok(())
+}
+
+// Clean all proxy-related git config values
+#[tauri::command]
+async fn clean_proxy_config() -> Result<Vec<String>, String> {
+    let proxy_keys = vec![
+        "http.proxy",
+        "https.proxy",
+        "http.sslVerify",
+        "http.sslBackend",
+        "http.sslCAInfo",
+        "http.sslCAPath",
+        "http.sslCert",
+        "http.sslKey",
+        "url.https://.insteadOf",
+        "url.http://.insteadOf",
+        "core.gitProxy",
+        "http.proxyAuthMethod",
+        "http.emptyAuth",
+    ];
+    
+    let mut cleaned = Vec::new();
+    
+    // First, clean the standard proxy keys
+    for key in proxy_keys {
+        let mut cmd = Command::new("git");
+        cmd.args(["config", "--global", "--unset-all", key]);
+        apply_no_window(&mut cmd);
+        
+        let output = cmd.output()
+            .map_err(|e| format!("Failed to unset {}: {}", key, e))?;
+        
+        // If it succeeded (not exit code 5 = not found), it was cleaned
+        if output.status.success() {
+            cleaned.push(key.to_string());
+        }
+    }
+    
+    // Also search for URL-specific proxy configurations like http.https://example.com.proxy
+    let mut list_cmd = Command::new("git");
+    list_cmd.args(["config", "--global", "--list"]);
+    apply_no_window(&mut list_cmd);
+    
+    if let Ok(output) = list_cmd.output() {
+        if output.status.success() {
+            let config_output = String::from_utf8_lossy(&output.stdout);
+            for line in config_output.lines() {
+                // Look for patterns like http.https://xxx.proxy or http.http://xxx.proxy
+                if line.contains(".proxy=") && (line.contains("http.http") || line.contains("http.https")) {
+                    if let Some(key) = line.split('=').next() {
+                        let key = key.trim();
+                        // Try to unset this specific URL proxy config
+                        let mut unset_cmd = Command::new("git");
+                        unset_cmd.args(["config", "--global", "--unset-all", key]);
+                        apply_no_window(&mut unset_cmd);
+                        
+                        if let Ok(unset_output) = unset_cmd.output() {
+                            if unset_output.status.success() {
+                                cleaned.push(key.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(cleaned)
 }
 
 // Git config entry for listing
@@ -856,6 +926,7 @@ pub fn run() {
             get_git_config_value,
             set_git_config_value,
             unset_git_config_value,
+            clean_proxy_config,
             list_git_config,
             pull_all_projects,
             load_config,

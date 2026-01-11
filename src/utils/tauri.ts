@@ -91,6 +91,11 @@ export async function unsetGitConfigValue(key: string): Promise<void> {
   return invoke<void>('unset_git_config_value', { key });
 }
 
+// Clean all proxy-related git config values
+export async function cleanProxyConfig(): Promise<string[]> {
+  return invoke<string[]>('clean_proxy_config');
+}
+
 export async function listGitConfig(): Promise<GitConfigEntry[]> {
   return invoke<GitConfigEntry[]>('list_git_config');
 }
