@@ -10,7 +10,7 @@
 
 ### 2. Comandos Rust Implementados
 - ✅ `get_branches` - Listar ramas
-- ✅ `checkout_branch` - Cambiar de rama
+- ✅ `checkout_branch` - Cambiar de rama hecho
 - ✅ `create_branch` - Crear nueva rama
 - ✅ `delete_branch` - Eliminar rama
 - ✅ `get_commits` - Historial de commits
