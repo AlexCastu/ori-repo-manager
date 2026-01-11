@@ -475,29 +475,29 @@ async fn clean_proxy_config() -> Result<Vec<String>, String> {
         "http.proxyAuthMethod",
         "http.emptyAuth",
     ];
-    
+
     let mut cleaned = Vec::new();
-    
+
     // First, clean the standard proxy keys
     for key in proxy_keys {
         let mut cmd = Command::new("git");
         cmd.args(["config", "--global", "--unset-all", key]);
         apply_no_window(&mut cmd);
-        
+
         let output = cmd.output()
             .map_err(|e| format!("Failed to unset {}: {}", key, e))?;
-        
+
         // If it succeeded (not exit code 5 = not found), it was cleaned
         if output.status.success() {
             cleaned.push(key.to_string());
         }
     }
-    
+
     // Also search for URL-specific proxy configurations like http.https://example.com.proxy
     let mut list_cmd = Command::new("git");
     list_cmd.args(["config", "--global", "--list"]);
     apply_no_window(&mut list_cmd);
-    
+
     if let Ok(output) = list_cmd.output() {
         if output.status.success() {
             let config_output = String::from_utf8_lossy(&output.stdout);
@@ -510,7 +510,7 @@ async fn clean_proxy_config() -> Result<Vec<String>, String> {
                         let mut unset_cmd = Command::new("git");
                         unset_cmd.args(["config", "--global", "--unset-all", key]);
                         apply_no_window(&mut unset_cmd);
-                        
+
                         if let Ok(unset_output) = unset_cmd.output() {
                             if unset_output.status.success() {
                                 cleaned.push(key.to_string());
@@ -521,7 +521,7 @@ async fn clean_proxy_config() -> Result<Vec<String>, String> {
             }
         }
     }
-    
+
     Ok(cleaned)
 }
 

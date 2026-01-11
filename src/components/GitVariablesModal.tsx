@@ -534,13 +534,13 @@ export function GitVariablesModal() {
           for (const variable of previousProfile.variables) {
             await unsetGitConfigValue(variable.key);
           }
-          
+
           // Si el perfil anterior tenía variables de proxy, limpiarlas completamente
-          const hadProxyVars = previousProfile.variables.some(v => 
-            v.key.toLowerCase().includes('proxy') || 
+          const hadProxyVars = previousProfile.variables.some(v =>
+            v.key.toLowerCase().includes('proxy') ||
             v.key.toLowerCase().includes('http.')
           );
-          
+
           if (hadProxyVars) {
             try {
               await cleanProxyConfig();
@@ -595,12 +595,12 @@ export function GitVariablesModal() {
 
         // Siempre limpiar las variables de proxy conocidas como medida de seguridad
         // Esto asegura que no queden proxies huérfanos que causen errores de conexión
-        const hasProxyVars = activeProfile.variables.some(v => 
-          v.key.toLowerCase().includes('proxy') || 
+        const hasProxyVars = activeProfile.variables.some(v =>
+          v.key.toLowerCase().includes('proxy') ||
           v.key.toLowerCase().includes('ssl') ||
           v.key.toLowerCase().includes('http.')
         );
-        
+
         if (hasProxyVars) {
           try {
             const cleanedKeys = await cleanProxyConfig();
@@ -614,23 +614,23 @@ export function GitVariablesModal() {
       }
 
       saveActiveProfileId(null);
-      
+
       // Verificar que las variables realmente se eliminaron
       await loadConfig();
-      
+
       // Verificar específicamente el proxy
       const currentConfig = await listGitConfig();
-      const remainingProxy = currentConfig.filter(e => 
+      const remainingProxy = currentConfig.filter(e =>
         e.key === 'http.proxy' || e.key === 'https.proxy'
       );
-      
+
       if (remainingProxy.length > 0) {
         // Intentar limpiar de nuevo
         console.warn('Aún quedan variables de proxy, intentando limpiar de nuevo...');
         await cleanProxyConfig();
         await loadConfig();
       }
-      
+
       addToast({
         type: 'success',
         title: 'Perfil desactivado',
@@ -926,7 +926,7 @@ export function GitVariablesModal() {
                             addToast({
                               type: 'success',
                               title: 'Proxy limpiado',
-                              message: cleaned.length > 0 
+                              message: cleaned.length > 0
                                 ? `Se eliminaron ${cleaned.length} configuraciones de proxy`
                                 : 'No había configuraciones de proxy',
                             });
