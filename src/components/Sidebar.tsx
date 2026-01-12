@@ -20,7 +20,8 @@ import {
   Zap,
   Box,
   Layers,
-  Settings2
+  Settings2,
+  Settings
 } from 'lucide-react';
 import { useStore, useEnvironments, useActiveEnvironment } from '../store/useStore';
 import { cn } from '../utils/helpers';
@@ -57,6 +58,7 @@ export function Sidebar() {
     openEnvironmentModal,
     openCloneModal,
     openGitVariablesModal,
+    openSettingsModal,
     scanCurrentEnvironment,
     triggerRefresh,
     isLoading,
@@ -184,14 +186,14 @@ export function Sidebar() {
                   {(() => {
                     const iconName = env.icon || defaultEnvironmentIcon;
                     const colorName = env.color || defaultEnvironmentColor;
-                    const IconComponent = iconComponents[iconName];
-                    const colorData = environmentColors[colorName];
+                    const IconComponent = iconComponents[iconName] || iconComponents[defaultEnvironmentIcon];
+                    const colorData = environmentColors[colorName as keyof typeof environmentColors] || environmentColors[defaultEnvironmentColor];
                     const isActive = activeEnvironment?.id === env.id;
-                    const isGradient = colorData.gradient.startsWith('linear-gradient');
+                    const isGradient = colorData?.gradient?.startsWith('linear-gradient') ?? false;
 
                     const backgroundStyle = isGradient
                       ? { background: colorData.gradient, opacity: isActive ? 1 : 0.45 }
-                      : { backgroundColor: colorData.primary, opacity: isActive ? 1 : 0.45 };
+                      : { backgroundColor: colorData?.primary || '#3B82F6', opacity: isActive ? 1 : 0.45 };
 
                     return (
                       <div
@@ -299,7 +301,7 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className={isCollapsed ? 'p-2 border-t border-[var(--glass-border-light)]' : 'p-4 border-t border-[var(--glass-border-light)]'}>
+      <div className={isCollapsed ? 'p-2 border-t border-[var(--glass-border-light)]' : 'p-4 border-t border-[var(--glass-border-light)] space-y-1'}>
         <button
           onClick={() => openGitVariablesModal()}
           className={`sidebar-item w-full ${isCollapsed ? 'justify-center p-2' : ''}`}
@@ -307,6 +309,14 @@ export function Sidebar() {
         >
           <Settings2 className="w-5 h-5" />
           {!isCollapsed && <span>Variables Git</span>}
+        </button>
+        <button
+          onClick={() => openSettingsModal()}
+          className={`sidebar-item w-full ${isCollapsed ? 'justify-center p-2' : ''}`}
+          title={isCollapsed ? 'Configuración' : undefined}
+        >
+          <Settings className="w-5 h-5" />
+          {!isCollapsed && <span>Configuración</span>}
         </button>
       </div>
     </motion.aside>

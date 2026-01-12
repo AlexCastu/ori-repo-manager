@@ -1,85 +1,33 @@
 import { useEffect, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { motion } from 'framer-motion';
-import { Minus, Square, X, Maximize2, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Logo } from './Logo';
 import { useStore } from '../store/useStore';
+
+// Función para detectar si es macOS - exportada para uso en otros componentes
+export function isMacOSPlatform(): boolean {
+  const platform = navigator.platform.toLowerCase();
+  return platform.includes('mac');
+}
 
 interface TitleBarProps {
   className?: string;
 }
 
 export function TitleBar({ className = '' }: TitleBarProps) {
-  const [isMaximized, setIsMaximized] = useState(false);
   const [isMacOS, setIsMacOS] = useState(false);
   const { openSettingsModal, config } = useStore();
 
   useEffect(() => {
     // Detect platform using navigator
-    const platform = navigator.platform.toLowerCase();
-    setIsMacOS(platform.includes('mac'));
+    setIsMacOS(isMacOSPlatform());
 
-    // Check if window is maximized (with error handling)
-    const checkMaximized = async () => {
-      try {
-        const appWindow = getCurrentWindow();
-        const maximized = await appWindow.isMaximized();
-        setIsMaximized(maximized);
-      } catch (error) {
-        console.warn('Could not check maximized state:', error);
-      }
-    };
-
-    checkMaximized();
-
-    // Set up listener for resize events
-    let cleanup: (() => void) | null = null;
-
-    const setupListener = async () => {
-      try {
-        const appWindow = getCurrentWindow();
-        const unlisten = await appWindow.onResized(() => {
-          checkMaximized();
-        });
-        cleanup = unlisten;
-      } catch (error) {
-        console.warn('Could not set up resize listener:', error);
-      }
-    };
-
-    setupListener();
-
-    return () => {
-      if (cleanup) cleanup();
-    };
   }, []);
 
-  const handleMinimize = async () => {
-    try {
-      const appWindow = getCurrentWindow();
-      await appWindow.minimize();
-    } catch (error) {
-      console.warn('Could not minimize:', error);
-    }
-  };
-
-  const handleMaximize = async () => {
-    try {
-      const appWindow = getCurrentWindow();
-      await appWindow.toggleMaximize();
-    } catch (error) {
-      console.warn('Could not toggle maximize:', error);
-    }
-  };
-
-  const handleClose = async () => {
-    try {
-      const appWindow = getCurrentWindow();
-      await appWindow.close();
-    } catch (error) {
-      console.warn('Could not close:', error);
-    }
-  };
+  // Solo mostrar en macOS - en Windows usamos decoraciones nativas
+  if (!isMacOS) {
+    return null;
+  }
 
   return (
     <div
@@ -93,7 +41,7 @@ export function TitleBar({ className = '' }: TitleBarProps) {
       }}
     >
       {/* macOS: Leave space for traffic lights (semáforo) */}
-      {isMacOS && <div className="w-[78px] flex-shrink-0" />}
+      <div className="w-[78px] flex-shrink-0" />
 
       {/* Logo only */}
       <div className="flex items-center gap-2 px-3 titlebar-no-drag">
@@ -123,45 +71,6 @@ export function TitleBar({ className = '' }: TitleBarProps) {
           <Settings className="w-5 h-5" />
         </motion.button>
       </div>
-
-      {/* Windows/Linux: Custom window controls */}
-      {!isMacOS && (
-        <div className="flex items-center titlebar-no-drag">
-          <motion.button
-            whileHover={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleMinimize}
-            className="h-10 w-12 flex items-center justify-center text-theme-secondary hover:text-theme-primary transition-colors"
-            title="Minimizar"
-          >
-            <Minus className="w-4 h-4" />
-          </motion.button>
-
-          <motion.button
-            whileHover={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleMaximize}
-            className="h-10 w-12 flex items-center justify-center text-theme-secondary hover:text-theme-primary transition-colors"
-            title={isMaximized ? "Restaurar" : "Maximizar"}
-          >
-            {isMaximized ? (
-              <Square className="w-3.5 h-3.5" />
-            ) : (
-              <Maximize2 className="w-4 h-4" />
-            )}
-          </motion.button>
-
-          <motion.button
-            whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.9)' }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleClose}
-            className="h-10 w-12 flex items-center justify-center text-theme-secondary hover:text-white transition-colors"
-            title="Cerrar"
-          >
-            <X className="w-4 h-4" />
-          </motion.button>
-        </div>
-      )}
     </div>
   );
 }

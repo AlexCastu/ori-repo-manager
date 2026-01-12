@@ -63,19 +63,24 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, [themeMode, systemPrefersDark]);
 
   const currentColor = useMemo(() => {
-    return activeEnvironment?.color || defaultEnvironmentColor;
+    const color = activeEnvironment?.color || defaultEnvironmentColor;
+    // Validate that color exists in environmentColors, fallback to default if not
+    if (color && environmentColors[color as EnvironmentColor]) {
+      return color as EnvironmentColor;
+    }
+    return defaultEnvironmentColor;
   }, [activeEnvironment?.color]);
 
   const themeValue = useMemo(() => ({
     color: currentColor,
-    colors: environmentColors[currentColor],
+    colors: environmentColors[currentColor] || environmentColors[defaultEnvironmentColor],
     themeMode,
     isDark,
   }), [currentColor, themeMode, isDark]);
 
   // Apply CSS variables and theme class to document root
   useEffect(() => {
-    const colors = environmentColors[currentColor];
+    const colors = environmentColors[currentColor] || environmentColors[defaultEnvironmentColor];
     const root = document.documentElement;
 
     // Apply dark/light class
