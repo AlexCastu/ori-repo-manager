@@ -69,6 +69,12 @@ jobs:
       - name: Build Tauri
         run: npm run tauri:build
 
+      - name: List build artifacts
+        run: |
+          echo "Listing bundle directory:"
+          ls -la src-tauri/target/release/bundle/ || echo "Bundle dir not found"
+          find src-tauri/target/release/bundle -name "*.dmg" -o -name "*.app" || echo "No dmg/app files found"
+
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v1
         with:
