@@ -43,9 +43,9 @@ jobs:
           echo "Searching for build artifacts..."
           mkdir -p artifacts
 
-          # Find all .exe and .msi files recursively
-          find src-tauri/target -name "*.exe" -type f -exec cp {} artifacts/ \;
-          find src-tauri/target -name "*.msi" -type f -exec cp {} artifacts/ \;
+          # Find only installer files in bundle directories
+          find src-tauri/target -path "*/bundle/nsis/*" -name "*.exe" -type f -exec cp {} artifacts/ \;
+          find src-tauri/target -path "*/bundle/msi/*" -name "*.msi" -type f -exec cp {} artifacts/ \;
 
           echo "Found artifacts:"
           ls -lh artifacts/
