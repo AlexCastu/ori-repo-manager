@@ -34,19 +34,23 @@ jobs:
       - name: Build Tauri
         run: npm run tauri:build
 
-      - name: List build artifacts
+      - name: Find and prepare artifacts
         shell: bash
         run: |
-          echo "Listing bundle directory:"
-          ls -la src-tauri/target/release/bundle/ || echo "Bundle dir not found"
-          find src-tauri/target/release/bundle -name "*.exe" -o -name "*.msi" || echo "No exe/msi files found"
+          echo "Searching for build artifacts..."
+          mkdir -p artifacts
+
+          # Find all .exe and .msi files recursively
+          find src-tauri/target -name "*.exe" -type f -exec cp {} artifacts/ \;
+          find src-tauri/target -name "*.msi" -type f -exec cp {} artifacts/ \;
+
+          echo "Found artifacts:"
+          ls -lh artifacts/
 
       - name: Upload Windows artifacts
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
+          files: artifacts/*
           draft: false
           prerelease: false
         env:
@@ -76,12 +80,21 @@ jobs:
       - name: Build Tauri
         run: npm run tauri:build
 
+      - name: Find and prepare artifacts
+        run: |
+          echo "Searching for build artifacts..."
+          mkdir -p artifacts
+
+          # Find all .dmg files recursively
+          find src-tauri/target -name "*.dmg" -type f -exec cp {} artifacts/ \;
+
+          echo "Found artifacts:"
+          ls -lh artifacts/
+
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app
+          files: artifacts/*
           draft: false
           prerelease: false
         env:
