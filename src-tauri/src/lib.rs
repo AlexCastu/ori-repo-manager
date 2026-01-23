@@ -237,14 +237,17 @@ async fn get_git_remote_url(project_path: String) -> Result<Option<String>, Stri
 #[tauri::command]
 async fn git_clone(repo_url: String, destination: String) -> Result<String, String> {
     let mut cmd = Command::new("git");
-    cmd.args(["clone", &repo_url, &destination]);
+    cmd.current_dir(&destination)
+        .args(["clone", &repo_url]);
     apply_no_window(&mut cmd);
 
     let output = cmd.output()
         .map_err(|e| format!("Failed to execute git clone: {}", e))?;
 
     if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Ok(format!("{}{}", stdout, stderr))
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
