@@ -6,6 +6,9 @@ on:
       - 'v*-windows'
       - 'v*-macos'
 
+permissions:
+  contents: write
+
 env:
   RUST_BACKTRACE: 1
 
