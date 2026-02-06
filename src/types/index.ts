@@ -74,6 +74,7 @@ export interface AppConfig {
   environments: Environment[];
   favorites: Record<string, Favorite>;
   projectNotes: Record<string, string>; // Notas independientes de favoritos
+  hiddenProjects: Record<string, string>; // key=projectName, value=hiddenAt ISO date
   projectsCache: Record<string, Record<string, Project>>;
   settings: AppSettings;
 }
@@ -227,7 +228,6 @@ export interface UISlice {
   favoriteNoteModal: ModalState & { data?: FavoriteNoteModalData };
   gitPullModal: ModalState & { data?: GitPullModalData };
   settingsModal: ModalState;
-  gitVariablesModal: ModalState;
   deleteEnvironmentModal: ModalState & { data?: DeleteEnvironmentModalData };
   tagManagerModal: ModalState;
   gitOperationsLogModal: ModalState;
@@ -245,8 +245,6 @@ export interface UISlice {
   closeGitPullModal: () => void;
   openSettingsModal: () => void;
   closeSettingsModal: () => void;
-  openGitVariablesModal: () => void;
-  closeGitVariablesModal: () => void;
   openDeleteEnvironmentModal: (data: DeleteEnvironmentModalData) => void;
   closeDeleteEnvironmentModal: () => void;
   openTagManagerModal: () => void;
@@ -258,6 +256,11 @@ export interface UISlice {
 export type AppStore = EnvironmentsSlice & ProjectsSlice & FavoritesSlice & ProjectNotesSlice & UISlice & {
   config: AppConfig | null;
   isInitialized: boolean;
+  // Hidden Projects
+  hiddenProjects: Record<string, string>;
+  showHiddenProjects: boolean;
+  toggleHideProject: (projectName: string) => void;
+  setShowHiddenProjects: (show: boolean) => void;
   // Tags
   tags: Record<string, ProjectTag>;
   projectTags: Record<string, string[]>;

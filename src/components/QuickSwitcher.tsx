@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Folder, Star } from 'lucide-react';
 import { useStore, useFilteredProjects } from '../store/useStore';
+import { openInIDE } from '../utils/tauri';
+import { getIdeLabel } from './IdeIcon';
 
 interface QuickSwitcherProps {
   isOpen: boolean;
@@ -12,13 +14,23 @@ export function QuickSwitcher({ isOpen, onClose }: QuickSwitcherProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { favorites } = useStore();
+  const { favorites, config, addToast } = useStore();
   const projects = useFilteredProjects();
+  const ideCommand = config?.settings?.ideCommand || 'code';
 
   const filteredProjects = projects.filter(p =>
     p.name.toLowerCase().includes(query.toLowerCase()) ||
     p.path.toLowerCase().includes(query.toLowerCase())
   ).slice(0, 8);
+
+  const handleOpenProject = async (projectPath: string) => {
+    try {
+      await openInIDE(projectPath, ideCommand);
+      onClose();
+    } catch {
+      addToast({ type: 'error', title: 'Error', message: `No se pudo abrir ${getIdeLabel(ideCommand)}` });
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -41,8 +53,7 @@ export function QuickSwitcher({ isOpen, onClose }: QuickSwitcherProps) {
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (filteredProjects[selectedIndex]) {
-          // Navigate to project
-          onClose();
+          handleOpenProject(filteredProjects[selectedIndex].path);
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -69,8 +80,8 @@ export function QuickSwitcher({ isOpen, onClose }: QuickSwitcherProps) {
         className="w-full max-w-2xl modal-base overflow-hidden"
       >
         {/* Search Input */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-[var(--glass-border-light)]">
-          <Search className="w-5 h-5 text-blue-400" />
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-[var(--border)]">
+          <Search className="w-5 h-5" style={{ color: 'var(--primary)' }} />
           <input
             ref={inputRef}
             type="text"
@@ -104,12 +115,12 @@ export function QuickSwitcher({ isOpen, onClose }: QuickSwitcherProps) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.03 }}
                     className={`flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-colors ${
-                      isSelected ? 'bg-blue-500/20' : 'hover:bg-blue-500/10'
+                      isSelected ? 'bg-[var(--primary-subtle)]' : 'hover:bg-[var(--hover-overlay)]'
                     }`}
                     onMouseEnter={() => setSelectedIndex(index)}
-                    onClick={onClose}
+                    onClick={() => handleOpenProject(project.path)}
                   >
-                    <Folder className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                    <Folder className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--primary)' }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-theme-primary font-medium">{project.name}</span>
@@ -125,7 +136,7 @@ export function QuickSwitcher({ isOpen, onClose }: QuickSwitcherProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3 border-t border-[var(--glass-border-light)] text-xs text-theme-muted">
+        <div className="flex items-center justify-between px-6 py-3 border-t border-[var(--border)] text-xs text-theme-muted">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded bg-black/20">↑↓</kbd>
@@ -133,7 +144,7 @@ export function QuickSwitcher({ isOpen, onClose }: QuickSwitcherProps) {
             </div>
             <div className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded bg-black/20">↵</kbd>
-              <span>Seleccionar</span>
+              <span>Abrir en {getIdeLabel(ideCommand)}</span>
             </div>
           </div>
           <div>

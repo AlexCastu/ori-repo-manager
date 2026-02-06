@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Settings, Star, RefreshCw, Save, FolderOpen, Palette, Copy, CheckCircle2, Sun, Moon, Monitor, Code } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -8,16 +8,18 @@ import { IDE_OPTIONS, IdeIcon } from './IdeIcon';
 import type { AppSettings } from '../types';
 
 export function SettingsModal() {
-  const { settingsModal, closeSettingsModal, config, addToast, saveConfig } = useStore();
+  const { settingsModal, closeSettingsModal, config, addToast, saveConfig, initialize } = useStore();
   useTheme(); // Keep theme context active
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [configPath, setConfigPath] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const originalSettingsRef = useRef<AppSettings | null>(null);
 
   useEffect(() => {
     if (settingsModal.isOpen && config) {
       setSettings({ ...config.settings });
+      originalSettingsRef.current = { ...config.settings };
       loadConfigPath();
     }
   }, [settingsModal.isOpen, config]);
@@ -47,18 +49,17 @@ export function SettingsModal() {
 
     setIsSaving(true);
     try {
-      const { config: currentConfig } = useStore.getState();
-      if (currentConfig) {
-        currentConfig.settings = settings;
-        await saveConfig();
-        addToast({
-          type: 'success',
-          title: 'Configuración guardada',
-          message: 'Los cambios se han aplicado correctamente',
-        });
-        closeSettingsModal();
-      }
-    } catch (error) {
+      // Update config immutably so ThemeProvider re-renders immediately
+      const updatedConfig = { ...config, settings };
+      useStore.setState({ config: updatedConfig });
+      await saveConfig();
+      addToast({
+        type: 'success',
+        title: 'Configuración guardada',
+        message: 'Los cambios se han aplicado correctamente',
+      });
+      closeSettingsModal();
+    } catch {
       addToast({
         type: 'error',
         title: 'Error',
@@ -67,6 +68,14 @@ export function SettingsModal() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCancel = () => {
+    // Revert theme preview to original if user cancels
+    if (config && originalSettingsRef.current) {
+      useStore.setState({ config: { ...config, settings: originalSettingsRef.current } });
+    }
+    closeSettingsModal();
   };
 
   if (!settingsModal.isOpen || !settings) return null;
@@ -80,7 +89,7 @@ export function SettingsModal() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-          onClick={closeSettingsModal}
+          onClick={handleCancel}
         />
 
         {/* Modal */}
@@ -92,18 +101,18 @@ export function SettingsModal() {
         >
           {/* Header */}
           <div className="flex items-center justify-between p-5"
-               style={{ borderBottom: '1px solid rgba(99, 163, 255, 0.15)' }}>
+               style={{ borderBottom: '1px solid var(--border)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="p-2 rounded-xl"
-                style={{ background: 'rgba(59, 130, 246, 0.2)' }}
+                style={{ background: 'var(--primary-subtle)' }}
               >
-                <Settings className="w-5 h-5" style={{ color: '#3B82F6' }} />
+                <Settings className="w-5 h-5" style={{ color: 'var(--primary)' }} />
               </div>
               <h2 className="text-lg font-bold text-theme-primary">Configuración</h2>
             </div>
             <button
-              onClick={closeSettingsModal}
+              onClick={handleCancel}
               className="btn-icon"
             >
               <X className="w-5 h-5" />
@@ -111,7 +120,7 @@ export function SettingsModal() {
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
             {/* Grid layout for main settings */}
             <div className="grid grid-cols-2 gap-6">
               {/* Left Column - Theme & Preferences */}
@@ -119,7 +128,7 @@ export function SettingsModal() {
                 {/* Theme Settings */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-theme-secondary">
-                    <Palette className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    <Palette className="w-4 h-4" style={{ color: 'var(--primary)' }} />
                     Tema de Interfaz
                   </div>
                   <div className="grid grid-cols-3 gap-2">
@@ -130,12 +139,18 @@ export function SettingsModal() {
                 ].map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
-                    onClick={() => setSettings({ ...settings, theme: value as AppSettings['theme'] })}
+                    onClick={() => {
+                      setSettings({ ...settings, theme: value as AppSettings['theme'] });
+                      // Apply theme immediately so user sees it before saving
+                      if (config) {
+                        useStore.setState({ config: { ...config, settings: { ...config.settings, theme: value as AppSettings['theme'] } } });
+                      }
+                    }}
                     className="flex flex-col items-center gap-2 p-3 rounded-lg transition-all border-2"
                     style={{
-                      background: settings.theme === value ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-elevated)',
-                      borderColor: settings.theme === value ? '#3B82F6' : 'transparent',
-                      color: settings.theme === value ? '#3B82F6' : 'var(--text-muted)'
+                      background: settings.theme === value ? 'var(--primary-subtle)' : 'var(--surface-alt)',
+                      borderColor: settings.theme === value ? 'var(--primary)' : 'transparent',
+                      color: settings.theme === value ? 'var(--primary)' : 'var(--text-muted)'
                     }}
                   >
                     <Icon className="w-5 h-5" />
@@ -150,7 +165,7 @@ export function SettingsModal() {
                   <div className="text-sm font-medium text-theme-secondary">Preferencias</div>
 
                   {/* Show Favorites First */}
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-theme-elevated">
+                  <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--surface-alt)' }}>
                     <div className="flex items-center gap-3">
                       <Star className="w-4 h-4" style={{ color: '#fcd34d' }} />
                       <span className="text-sm text-theme-secondary">Mostrar favoritos primero</span>
@@ -158,7 +173,7 @@ export function SettingsModal() {
                     <button
                       onClick={() => setSettings({ ...settings, showFavoritesFirst: !settings.showFavoritesFirst })}
                       className="relative w-11 h-6 rounded-full transition-colors"
-                      style={{ backgroundColor: settings.showFavoritesFirst ? '#3B82F6' : '#4b5563' }}
+                      style={{ backgroundColor: settings.showFavoritesFirst ? 'var(--primary)' : '#4b5563' }}
                     >
                       <span
                         className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
@@ -168,15 +183,15 @@ export function SettingsModal() {
                   </div>
 
                   {/* Auto Scan on Start */}
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-theme-elevated">
+                  <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--surface-alt)' }}>
                     <div className="flex items-center gap-3">
-                      <RefreshCw className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                      <RefreshCw className="w-4 h-4" style={{ color: 'var(--primary)' }} />
                       <span className="text-sm text-theme-secondary">Escaneo automático al iniciar</span>
                     </div>
                     <button
                       onClick={() => setSettings({ ...settings, autoScanOnStart: !settings.autoScanOnStart })}
                       className="relative w-11 h-6 rounded-full transition-colors"
-                      style={{ backgroundColor: settings.autoScanOnStart ? '#3B82F6' : '#4b5563' }}
+                      style={{ backgroundColor: settings.autoScanOnStart ? 'var(--primary)' : '#4b5563' }}
                     >
                       <span
                         className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
@@ -189,7 +204,7 @@ export function SettingsModal() {
                 {/* IDE Configuration */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-theme-secondary">
-                    <Code className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    <Code className="w-4 h-4" style={{ color: 'var(--primary)' }} />
                     Editor de Código
                   </div>
                   {/* IDE Selector */}
@@ -197,8 +212,10 @@ export function SettingsModal() {
                     <select
                       value={settings.ideCommand || 'code'}
                       onChange={(e) => setSettings({ ...settings, ideCommand: e.target.value })}
-                      className="w-full p-3 pl-11 rounded-lg bg-theme-elevated text-theme-primary text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3B82F6] border border-[var(--glass-border-light)]"
+                      className="w-full p-3 pl-11 rounded-lg text-theme-primary text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 border"
                       style={{
+                        background: 'var(--surface-alt)',
+                        borderColor: 'var(--border)',
                         backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%233B82F6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
                         backgroundRepeat: 'no-repeat',
                         backgroundPosition: 'right 12px center',
@@ -216,7 +233,7 @@ export function SettingsModal() {
                     </div>
                   </div>
                   {/* Custom command input */}
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-theme-elevated border border-[var(--glass-border-light)]">
+                  <div className="flex items-center gap-2 p-2 rounded-lg border" style={{ background: 'var(--surface-alt)', borderColor: 'var(--border)' }}>
                     <span className="text-xs text-theme-muted shrink-0">Comando:</span>
                     <input
                       type="text"
@@ -234,22 +251,22 @@ export function SettingsModal() {
                 {/* Config File Location */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-theme-secondary">
-                    <FolderOpen className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    <FolderOpen className="w-4 h-4" style={{ color: 'var(--primary)' }} />
                     Ubicación de Configuración
                   </div>
-                  <div className="p-3 rounded-lg bg-[rgba(59,130,246,0.1)]">
+                  <div className="p-3 rounded-lg" style={{ background: 'var(--primary-subtle)' }}>
                     <p className="text-xs mb-2 text-theme-muted">
                       Archivo de configuración (config.json):
                     </p>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 text-xs px-2 py-1.5 rounded bg-theme-elevated text-theme-secondary overflow-auto max-w-[250px] truncate">
+                      <code className="flex-1 text-xs px-2 py-1.5 rounded text-theme-secondary overflow-auto max-w-[250px] truncate" style={{ background: 'var(--surface-alt)' }}>
                         {configPath || 'Cargando...'}
                       </code>
                       {configPath && (
                         <button
                           onClick={handleCopyPath}
                           className="p-2 rounded-lg transition-colors flex-shrink-0"
-                          style={{ background: copied ? 'rgba(34, 197, 94, 0.2)' : 'rgba(59, 130, 246, 0.2)', color: copied ? '#22c55e' : '#3B82F6' }}
+                          style={{ background: copied ? 'var(--success-subtle)' : 'var(--primary-subtle)', color: copied ? 'var(--success)' : 'var(--primary)' }}
                           title="Copiar ruta"
                         >
                           {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -260,16 +277,11 @@ export function SettingsModal() {
                 </div>
 
                 {/* Version Info */}
-                <div className="p-4 rounded-xl bg-theme-elevated border border-[var(--glass-border-light)]">
+                <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-alt)', borderColor: 'var(--border)' }}>
                   <div className="flex items-center gap-4">
-                    <img
-                      src="/logo.png"
-                      alt="ORI-RM Logo"
-                      className="w-12 h-12 rounded-xl"
-                      style={{
-                        boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
-                      }}
-                    />
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary-subtle)' }}>
+                      <Code className="w-6 h-6" style={{ color: 'var(--primary)' }} />
+                    </div>
                     <div>
                       <h3 className="text-sm font-bold text-theme-primary">ORI-RepoManager</h3>
                       <p className="text-xs text-theme-muted">v{config?.version || '2.0.0'}</p>
@@ -282,9 +294,9 @@ export function SettingsModal() {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 p-5 border-t border-[var(--glass-border-light)]">
+          <div className="flex justify-end gap-3 p-5" style={{ borderTop: '1px solid var(--border)' }}>
             <button
-              onClick={closeSettingsModal}
+              onClick={handleCancel}
               className="btn-secondary text-sm"
             >
               Cancelar
