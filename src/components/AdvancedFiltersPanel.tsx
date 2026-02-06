@@ -43,15 +43,6 @@ export function AdvancedFiltersPanel({ isOpen, onClose, buttonRef }: AdvancedFil
     setFilters({ platforms: updated });
   };
 
-  // Check if there are active filters (used by UI indicators)
-  const hasActiveFilters =
-    filters.gitStatus !== 'all' ||
-    filters.platforms.length > 0 ||
-    filters.hasUncommitted !== null;
-
-  // Log for debugging purposes
-  console.debug('Active filters:', hasActiveFilters);
-
   if (!isOpen) return null;
 
   return createPortal(

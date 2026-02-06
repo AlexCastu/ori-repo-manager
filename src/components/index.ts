@@ -11,7 +11,5 @@ export { AdvancedFiltersPanel } from './AdvancedFiltersPanel';
 export { QuickSwitcher } from './QuickSwitcher';
 export { TagManager } from './TagManager';
 export { GitOperationsLog } from './GitOperationsLog';
-export { Logo } from './Logo';
-export { TitleBar } from './TitleBar';
 export { IdeIcon, IDE_OPTIONS, IDE_INSTALL_INSTRUCTIONS, getIdeLabel } from './IdeIcon';
 export { PullResultsModal } from './PullResultsModal';

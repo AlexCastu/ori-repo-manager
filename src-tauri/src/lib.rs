@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 use walkdir::WalkDir;
 
 mod git_advanced;
@@ -81,9 +82,16 @@ pub struct AppConfig {
     pub version: String,
     pub environments: Vec<Environment>,
     pub favorites: HashMap<String, Favorite>,
+    #[serde(rename = "projectNotes", default)]
+    pub project_notes: HashMap<String, String>,
+    #[serde(rename = "hiddenProjects", default)]
+    pub hidden_projects: HashMap<String, String>,
     #[serde(rename = "projectsCache")]
     pub projects_cache: HashMap<String, HashMap<String, Project>>,
     pub settings: AppSettings,
+    // Preserve extra fields from frontend (tags, projectTags, autoSyncConfig, etc.)
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 // ==================== HELPER FUNCTIONS ====================
@@ -107,6 +115,8 @@ fn get_default_config() -> AppConfig {
         version: "2.0.0".to_string(),
         environments: vec![],
         favorites: HashMap::new(),
+        project_notes: HashMap::new(),
+        hidden_projects: HashMap::new(),
         projects_cache: HashMap::new(),
         settings: AppSettings {
             theme: "dark".to_string(),
@@ -115,6 +125,7 @@ fn get_default_config() -> AppConfig {
             auto_scan_on_start: true,
             ide_command: "code".to_string(),
         },
+        extra: HashMap::new(),
     }
 }
 
@@ -217,17 +228,45 @@ async fn scan_projects(base_path: String) -> Result<Vec<Project>, String> {
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-// Helper macro for Windows to hide CMD window
+// Helper for Windows to hide CMD window
 #[cfg(target_os = "windows")]
-fn apply_no_window(cmd: &mut Command) {
+pub fn apply_no_window(cmd: &mut Command) {
     use std::os::windows::process::CommandExt;
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 
 #[cfg(not(target_os = "windows"))]
-fn apply_no_window(_cmd: &mut Command) {
+pub fn apply_no_window(_cmd: &mut Command) {
     // No-op on non-Windows
 }
+
+/// Run a Command with a timeout. Returns the Output or an error if it times out.
+pub fn run_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std::process::Output, String> {
+    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn process: {}", e))?;
+
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_status)) => {
+                // Process finished — collect output
+                let output = child.wait_with_output().map_err(|e| format!("Failed to read output: {}", e))?;
+                return Ok(output);
+            }
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err("Operación cancelada: tiempo de espera agotado (sin conectividad?)".to_string());
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            Err(e) => return Err(format!("Error waiting for process: {}", e)),
+        }
+    }
+}
+
+/// Default timeout for network git operations (15 seconds)
+pub const GIT_NETWORK_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[tauri::command]
 async fn get_git_remote_url(project_path: String) -> Result<Option<String>, String> {
@@ -236,18 +275,29 @@ async fn get_git_remote_url(project_path: String) -> Result<Option<String>, Stri
 
 #[tauri::command]
 async fn git_clone(repo_url: String, destination: String) -> Result<String, String> {
+    let dest = Path::new(&destination);
+
+    // Ensure destination directory exists
+    if !dest.exists() {
+        fs::create_dir_all(dest)
+            .map_err(|e| format!("No se pudo crear el directorio destino: {}", e))?;
+    }
+
+    // Run `git clone <url>` inside the destination directory.
+    // Git will create a subfolder with the repo name automatically.
     let mut cmd = Command::new("git");
     cmd.current_dir(&destination)
         .args(["clone", &repo_url]);
     apply_no_window(&mut cmd);
 
-    let output = cmd.output()
-        .map_err(|e| format!("Failed to execute git clone: {}", e))?;
+    // Clone can take longer — use 120 second timeout
+    let output = run_with_timeout(&mut cmd, Duration::from_secs(120))?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        Ok(format!("{}{}", stdout, stderr))
+        // git clone prints progress to stderr, so include both
+        Ok(if stdout.is_empty() { stderr } else { format!("{}\n{}", stdout, stderr) })
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
@@ -258,11 +308,10 @@ async fn git_pull(project_path: String) -> Result<String, String> {
     // First, fetch all branches from all remotes
     let mut fetch_cmd = Command::new("git");
     fetch_cmd.current_dir(&project_path)
-        .args(["fetch", "--all"]);
+        .args(["fetch", "--all", "--prune"]);
     apply_no_window(&mut fetch_cmd);
 
-    let fetch_output = fetch_cmd.output()
-        .map_err(|e| format!("Failed to execute git fetch: {}", e))?;
+    let fetch_output = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT)?;
 
     // Then, pull the current branch
     let mut pull_cmd = Command::new("git");
@@ -270,8 +319,7 @@ async fn git_pull(project_path: String) -> Result<String, String> {
         .args(["pull"]);
     apply_no_window(&mut pull_cmd);
 
-    let pull_output = pull_cmd.output()
-        .map_err(|e| format!("Failed to execute git pull: {}", e))?;
+    let pull_output = run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT)?;
 
     if pull_output.status.success() {
         let fetch_msg = String::from_utf8_lossy(&fetch_output.stdout);
@@ -355,161 +403,6 @@ async fn get_config_file_path() -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-// ==================== GIT CONFIG VARIABLES MANAGEMENT ====================
-
-// Get a single git config value by key
-#[tauri::command]
-async fn get_git_config_value(key: String) -> Result<String, String> {
-    let mut cmd = Command::new("git");
-    cmd.args(["config", "--global", "--get", &key]);
-    apply_no_window(&mut cmd);
-
-    let output = cmd.output()
-        .map_err(|e| format!("Failed to get git config {}: {}", key, e))?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        Ok(String::new()) // Key not set
-    }
-}
-
-// Set a git config value
-#[tauri::command]
-async fn set_git_config_value(key: String, value: String) -> Result<(), String> {
-    let mut cmd = Command::new("git");
-    cmd.args(["config", "--global", &key, &value]);
-    apply_no_window(&mut cmd);
-
-    cmd.output()
-        .map_err(|e| format!("Failed to set git config {}: {}", key, e))?;
-
-    Ok(())
-}
-
-// Unset (remove) a git config value - uses --unset-all to remove all instances
-#[tauri::command]
-async fn unset_git_config_value(key: String) -> Result<(), String> {
-    let mut cmd = Command::new("git");
-    // Use --unset-all to ensure ALL instances of this key are removed
-    cmd.args(["config", "--global", "--unset-all", &key]);
-    apply_no_window(&mut cmd);
-
-    let output = cmd.output()
-        .map_err(|e| format!("Failed to unset git config {}: {}", key, e))?;
-
-    // Don't error if key doesn't exist (exit code 5)
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        // Exit code 5 means key doesn't exist, which is fine
-        if output.status.code() != Some(5) && !stderr.is_empty() {
-            return Err(format!("Failed to unset {}: {}", key, stderr));
-        }
-    }
-
-    Ok(())
-}
-
-// Clean all proxy-related git config values
-#[tauri::command]
-async fn clean_proxy_config() -> Result<Vec<String>, String> {
-    let proxy_keys = vec![
-        "http.proxy",
-        "https.proxy",
-        "http.sslVerify",
-        "http.sslBackend",
-        "http.sslCAInfo",
-        "http.sslCAPath",
-        "http.sslCert",
-        "http.sslKey",
-        "url.https://.insteadOf",
-        "url.http://.insteadOf",
-        "core.gitProxy",
-        "http.proxyAuthMethod",
-        "http.emptyAuth",
-    ];
-
-    let mut cleaned = Vec::new();
-
-    // First, clean the standard proxy keys
-    for key in proxy_keys {
-        let mut cmd = Command::new("git");
-        cmd.args(["config", "--global", "--unset-all", key]);
-        apply_no_window(&mut cmd);
-
-        let output = cmd.output()
-            .map_err(|e| format!("Failed to unset {}: {}", key, e))?;
-
-        // If it succeeded (not exit code 5 = not found), it was cleaned
-        if output.status.success() {
-            cleaned.push(key.to_string());
-        }
-    }
-
-    // Also search for URL-specific proxy configurations like http.https://example.com.proxy
-    let mut list_cmd = Command::new("git");
-    list_cmd.args(["config", "--global", "--list"]);
-    apply_no_window(&mut list_cmd);
-
-    if let Ok(output) = list_cmd.output() {
-        if output.status.success() {
-            let config_output = String::from_utf8_lossy(&output.stdout);
-            for line in config_output.lines() {
-                // Look for patterns like http.https://xxx.proxy or http.http://xxx.proxy
-                if line.contains(".proxy=") && (line.contains("http.http") || line.contains("http.https")) {
-                    if let Some(key) = line.split('=').next() {
-                        let key = key.trim();
-                        // Try to unset this specific URL proxy config
-                        let mut unset_cmd = Command::new("git");
-                        unset_cmd.args(["config", "--global", "--unset-all", key]);
-                        apply_no_window(&mut unset_cmd);
-
-                        if let Ok(unset_output) = unset_cmd.output() {
-                            if unset_output.status.success() {
-                                cleaned.push(key.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(cleaned)
-}
-
-// Git config entry for listing
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitConfigEntry {
-    pub key: String,
-    pub value: String,
-}
-
-// List all git global config entries
-#[tauri::command]
-async fn list_git_config() -> Result<Vec<GitConfigEntry>, String> {
-    let mut cmd = Command::new("git");
-    cmd.args(["config", "--global", "--list"]);
-    apply_no_window(&mut cmd);
-
-    let output = cmd.output()
-        .map_err(|e| format!("Failed to list git config: {}", e))?;
-
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    let mut entries = Vec::new();
-
-    for line in output_str.lines() {
-        if let Some((key, value)) = line.split_once('=') {
-            entries.push(GitConfigEntry {
-                key: key.to_string(),
-                value: value.to_string(),
-            });
-        }
-    }
-
-    Ok(entries)
-}
-
 // Pull all projects in a directory
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PullResult {
@@ -520,61 +413,97 @@ pub struct PullResult {
 
 #[tauri::command]
 async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String> {
+    use std::thread;
+    use std::sync::{Arc, Mutex};
+
     let base = Path::new(&base_path);
     if !base.exists() {
         return Err(format!("Base path does not exist: {}", base_path));
     }
 
-    let mut results = Vec::new();
-
     let entries = fs::read_dir(base)
         .map_err(|e| format!("Failed to read directory: {}", e))?;
 
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() && path.join(".git").exists() {
-            let project_name = path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
+    // Collect all git project paths first
+    let projects: Vec<(String, std::path::PathBuf)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.is_dir() && path.join(".git").exists() {
+                let name = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                Some((name, path))
+            } else {
+                None
+            }
+        })
+        .collect();
 
-            let mut cmd = Command::new("git");
-            cmd.current_dir(&path).args(["pull"]);
-            apply_no_window(&mut cmd);
+    let results = Arc::new(Mutex::new(Vec::new()));
 
-            let output = cmd.output();
+    // Process in parallel chunks of 4
+    for chunk in projects.chunks(4) {
+        let handles: Vec<_> = chunk.iter().map(|(name, path)| {
+            let project_name = name.clone();
+            let project_path = path.clone();
+            let results = Arc::clone(&results);
 
-            match output {
-                Ok(out) => {
-                    if out.status.success() {
-                        let msg = String::from_utf8_lossy(&out.stdout).to_string();
-                        results.push(PullResult {
-                            project_name,
-                            success: true,
-                            message: if msg.contains("Already up to date") {
-                                "Ya actualizado".to_string()
-                            } else {
-                                "Actualizado correctamente".to_string()
-                            },
-                        });
-                    } else {
-                        results.push(PullResult {
-                            project_name,
-                            success: false,
-                            message: String::from_utf8_lossy(&out.stderr).to_string(),
-                        });
+            thread::spawn(move || {
+                // First: fetch --all --prune (clean stale remote branches)
+                let mut fetch_cmd = Command::new("git");
+                fetch_cmd.current_dir(&project_path)
+                    .args(["fetch", "--all", "--prune"]);
+                apply_no_window(&mut fetch_cmd);
+                let _ = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT);
+
+                // Then: pull
+                let mut pull_cmd = Command::new("git");
+                pull_cmd.current_dir(&project_path).args(["pull"]);
+                apply_no_window(&mut pull_cmd);
+
+                let result = match run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT) {
+                    Ok(out) => {
+                        if out.status.success() {
+                            let msg = String::from_utf8_lossy(&out.stdout).to_string();
+                            PullResult {
+                                project_name,
+                                success: true,
+                                message: if msg.contains("Already up to date") {
+                                    "Ya actualizado".to_string()
+                                } else {
+                                    "Actualizado correctamente".to_string()
+                                },
+                            }
+                        } else {
+                            PullResult {
+                                project_name,
+                                success: false,
+                                message: String::from_utf8_lossy(&out.stderr).to_string(),
+                            }
+                        }
                     }
-                }
-                Err(e) => {
-                    results.push(PullResult {
+                    Err(e) => PullResult {
                         project_name,
                         success: false,
-                        message: format!("Error: {}", e),
-                    });
-                }
-            }
+                        message: e,
+                    },
+                };
+
+                results.lock().unwrap().push(result);
+            })
+        }).collect();
+
+        for handle in handles {
+            let _ = handle.join();
         }
     }
+
+    let results = Arc::try_unwrap(results)
+        .map_err(|_| "Failed to unwrap results".to_string())?
+        .into_inner()
+        .map_err(|e| format!("Mutex error: {}", e))?;
 
     Ok(results)
 }
@@ -812,11 +741,10 @@ async fn get_git_status(project_path: String) -> Result<GitStatus, String> {
 async fn git_fetch(project_path: String) -> Result<String, String> {
     let mut cmd = Command::new("git");
     cmd.current_dir(&project_path)
-        .args(["fetch", "--all"]);
+        .args(["fetch", "--all", "--prune"]);
     apply_no_window(&mut cmd);
 
-    let output = cmd.output()
-        .map_err(|e| format!("Failed to fetch: {}", e))?;
+    let output = run_with_timeout(&mut cmd, GIT_NETWORK_TIMEOUT)?;
 
     if output.status.success() {
         Ok("Fetch completado".to_string())
@@ -868,11 +796,6 @@ pub fn run() {
             git_config,
             git_fetch,
             get_git_status,
-            get_git_config_value,
-            set_git_config_value,
-            unset_git_config_value,
-            clean_proxy_config,
-            list_git_config,
             pull_all_projects,
             load_config,
             save_config,

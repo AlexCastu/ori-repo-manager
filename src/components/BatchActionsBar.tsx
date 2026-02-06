@@ -1,13 +1,14 @@
 import { motion } from 'framer-motion';
-import { Upload, RefreshCw, X, Check } from 'lucide-react';
+import { Download, RefreshCw, X, Check, GitBranch } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { batchGitPull } from '../utils/tauriAdvanced';
+import { batchGitPull, batchGitFetch } from '../utils/tauriAdvanced';
 import { useState } from 'react';
 import { PullResultsModal, type PullResult } from './PullResultsModal';
 
 export function BatchActionsBar() {
   const { selectedProjects, deselectAllProjects, addToast, triggerRefresh } = useStore();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [pullResults, setPullResults] = useState<PullResult[]>([]);
   const [showResultsModal, setShowResultsModal] = useState(false);
 
@@ -25,7 +26,6 @@ export function BatchActionsBar() {
     try {
       const apiResults = await batchGitPull(selectedPaths);
 
-      // Convert to modal format
       const results: PullResult[] = apiResults.map(([path, result]) => {
         const projectName = path.split('/').pop() || path;
         const isSuccess = 'Ok' in result;
@@ -47,20 +47,46 @@ export function BatchActionsBar() {
       addToast({
         type: success === results.length ? 'success' : 'warning',
         title: 'Pull completado',
-        message: `✓ ${success} exitosos, ✗ ${failed} fallidos`,
+        message: `${success} exitosos, ${failed} fallidos`,
       });
 
-      // Trigger refresh to update git status in cards
       triggerRefresh();
-    } catch (error) {
+    } catch {
       addToast({
         type: 'error',
         title: 'Error',
-        message: 'Failed to pull repositories',
+        message: 'No se pudo hacer pull de los repositorios',
       });
       setShowResultsModal(false);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleBatchFetch = async () => {
+    setIsFetching(true);
+
+    try {
+      const apiResults = await batchGitFetch(selectedPaths);
+
+      const success = apiResults.filter(([, result]) => 'Ok' in result).length;
+      const failed = apiResults.filter(([, result]) => 'Err' in result).length;
+
+      addToast({
+        type: failed > 0 ? 'warning' : 'success',
+        title: 'Fetch completado',
+        message: `${success} exitosos, ${failed} fallidos`,
+      });
+
+      triggerRefresh();
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo hacer fetch de los repositorios',
+      });
+    } finally {
+      setIsFetching(false);
     }
   };
 
@@ -77,7 +103,7 @@ export function BatchActionsBar() {
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center"
               style={{
-                background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)',
+                background: 'linear-gradient(135deg, var(--primary), var(--primary-muted))',
               }}
             >
               <Check className="w-4 h-4 text-white" />
@@ -87,22 +113,39 @@ export function BatchActionsBar() {
             </span>
           </div>
 
-          <div className="h-8 w-px bg-[var(--glass-border-light)]" />
+          <div className="h-8 w-px bg-[var(--border)]" />
 
+          {/* Pull Selected */}
           <button
             onClick={handleBatchPull}
-            disabled={isProcessing}
+            disabled={isProcessing || isFetching}
             className="btn-primary flex items-center gap-2 px-4 py-2"
+            title="Descarga los cambios remotos y actualiza tu rama local (fetch + merge)"
           >
             {isProcessing ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <Upload className="w-4 h-4" />
+              <Download className="w-4 h-4" />
             )}
-            <span>Pull & Fetch All</span>
+            <span>Pull</span>
           </button>
 
-          <div className="h-8 w-px bg-[var(--glass-border-light)]" />
+          {/* Fetch Selected */}
+          <button
+            onClick={handleBatchFetch}
+            disabled={isProcessing || isFetching}
+            className="btn-secondary flex items-center gap-2 px-4 py-2"
+            title="Consulta los cambios remotos sin modificar tu rama local (solo actualiza referencias)"
+          >
+            {isFetching ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <GitBranch className="w-4 h-4" />
+            )}
+            <span>Fetch</span>
+          </button>
+
+          <div className="h-8 w-px bg-[var(--border)]" />
 
           <button
             onClick={deselectAllProjects}
