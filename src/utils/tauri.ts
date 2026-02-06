@@ -89,6 +89,7 @@ export function getDefaultConfig(): AppConfig {
     environments: [],
     favorites: {},
     projectNotes: {},
+    hiddenProjects: {},
     projectsCache: {},
     settings: {
       theme: 'dark',
