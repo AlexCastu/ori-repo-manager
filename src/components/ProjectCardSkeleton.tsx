@@ -10,60 +10,60 @@ function SingleSkeleton({ index }: { index: number }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="flex items-center gap-3 px-4 py-3 rounded-2xl project-card"
+      className="flex flex-col gap-1.5 px-4 py-3 rounded-xl project-card"
     >
-      {/* Checkbox skeleton */}
-      <div
-        className="w-5 h-5 rounded-md animate-pulse bg-[var(--glass-border)]"
-      />
+      {/* Row 1: Identity & Status */}
+      <div className="flex items-center gap-2.5">
+        {/* Checkbox */}
+        <div className="w-5 h-5 rounded-md animate-pulse bg-[var(--border)]" />
 
-      {/* Star skeleton */}
-      <div
-        className="w-6 h-6 rounded-xl animate-pulse bg-[var(--glass-border-light)]"
-      />
+        {/* Star */}
+        <div className="w-6 h-6 rounded-lg animate-pulse bg-[var(--border-subtle)]" />
 
-      {/* Platform icon skeleton */}
-      <div
-        className="w-4 h-4 rounded animate-pulse bg-blue-500/20"
-      />
+        {/* Platform icon */}
+        <div className="w-[18px] h-[18px] rounded animate-pulse bg-[var(--primary-subtle)]" />
 
-      {/* Content skeleton */}
-      <div className="flex-1 min-w-0 space-y-2">
-        {/* Title */}
+        {/* Project name */}
         <div
-          className="h-4 rounded-lg animate-pulse"
+          className="h-4 rounded-md animate-pulse"
           style={{
-            background: 'linear-gradient(90deg, var(--glass-border) 0%, var(--glass-border-light) 50%, var(--glass-border) 100%)',
-            backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite',
-            width: `${60 + Math.random() * 30}%`
+            background: 'var(--border)',
+            width: `${80 + Math.random() * 100}px`
           }}
         />
-        {/* URL */}
-        <div
-          className="h-3 rounded-lg animate-pulse"
-          style={{
-            background: 'linear-gradient(90deg, var(--glass-border-light) 0%, transparent 50%, var(--glass-border-light) 100%)',
-            backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite',
-            width: `${70 + Math.random() * 25}%`
-          }}
-        />
+
+        {/* Branch badge */}
+        <div className="hidden sm:block h-5 w-16 rounded-md animate-pulse bg-[var(--surface-alt)]" />
+
+        <div className="flex-1" />
+
+        {/* Status badge */}
+        <div className="w-6 h-6 rounded-full animate-pulse bg-[var(--border-subtle)]" />
+
+        {/* IDE button */}
+        <div className="h-7 w-16 rounded-xl animate-pulse bg-[var(--border-subtle)]" />
       </div>
 
-      {/* Status badge skeleton */}
-      <div
-        className="w-6 h-6 rounded-full animate-pulse bg-[var(--glass-border-light)]"
-      />
+      {/* Row 2: Metadata & Actions */}
+      <div className="flex items-center justify-between gap-3 pl-[88px]">
+        {/* URL */}
+        <div
+          className="h-3 rounded-md animate-pulse"
+          style={{
+            background: 'var(--border-subtle)',
+            width: `${120 + Math.random() * 150}px`
+          }}
+        />
 
-      {/* Action buttons skeleton */}
-      <div className="flex items-center gap-1">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="w-8 h-8 rounded-xl animate-pulse bg-[var(--glass-border-light)]"
-          />
-        ))}
+        {/* Action buttons */}
+        <div className="flex items-center gap-0.5">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="w-8 h-8 rounded-lg animate-pulse bg-[var(--border-subtle)]"
+            />
+          ))}
+        </div>
       </div>
     </motion.div>
   );
@@ -75,14 +75,6 @@ export function ProjectCardSkeleton({ count = 5 }: ProjectCardSkeletonProps) {
       {Array.from({ length: count }).map((_, index) => (
         <SingleSkeleton key={index} index={index} />
       ))}
-
-      {/* Global shimmer animation */}
-      <style>{`
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-      `}</style>
     </div>
   );
 }

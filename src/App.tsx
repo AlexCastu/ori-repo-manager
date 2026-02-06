@@ -11,12 +11,10 @@ import {
   QuickSwitcher,
   TagManager,
   GitOperationsLog,
-  TitleBar
 } from './components';
 import { GitPullModal } from './components/GitPullModal';
 import { GitCloneModal } from './components/GitCloneModal';
 import { SettingsModal } from './components/SettingsModal';
-import { GitVariablesModal } from './components/GitVariablesModal';
 import { DeleteEnvironmentModal } from './components/DeleteEnvironmentModal';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useStore } from './store/useStore';
@@ -68,9 +66,6 @@ function App() {
   return (
     <ThemeProvider>
       <div className="h-screen w-screen flex flex-col overflow-hidden gradient-mesh relative">
-        {/* Custom Title Bar */}
-        <TitleBar />
-
         {/* Main content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
@@ -89,7 +84,6 @@ function App() {
         <GitPullModal />
         <GitCloneModal />
         <SettingsModal />
-        <GitVariablesModal />
         <DeleteEnvironmentModal />
 
         {/* New Components */}

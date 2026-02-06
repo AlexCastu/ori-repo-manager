@@ -20,7 +20,6 @@ import {
   Zap,
   Box,
   Layers,
-  Settings2,
   Settings
 } from 'lucide-react';
 import { useStore, useEnvironments, useActiveEnvironment } from '../store/useStore';
@@ -57,7 +56,6 @@ export function Sidebar() {
     setActiveEnvironment,
     openEnvironmentModal,
     openCloneModal,
-    openGitVariablesModal,
     openSettingsModal,
     scanCurrentEnvironment,
     triggerRefresh,
@@ -302,14 +300,6 @@ export function Sidebar() {
       </div>
 
       <div className={isCollapsed ? 'p-2 border-t border-[var(--glass-border-light)]' : 'p-4 border-t border-[var(--glass-border-light)] space-y-1'}>
-        <button
-          onClick={() => openGitVariablesModal()}
-          className={`sidebar-item w-full ${isCollapsed ? 'justify-center p-2' : ''}`}
-          title={isCollapsed ? 'Variables Git' : undefined}
-        >
-          <Settings2 className="w-5 h-5" />
-          {!isCollapsed && <span>Variables Git</span>}
-        </button>
         <button
           onClick={() => openSettingsModal()}
           className={`sidebar-item w-full ${isCollapsed ? 'justify-center p-2' : ''}`}

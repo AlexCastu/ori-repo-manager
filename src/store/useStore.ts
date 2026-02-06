@@ -70,6 +70,26 @@ export const useStore = create<AppStore>()(
       // Project Notes (independiente de favoritos)
       projectNotes: {},
 
+      // Hidden Projects
+      hiddenProjects: {},
+      showHiddenProjects: false,
+
+      toggleHideProject: (projectName) => {
+        const { hiddenProjects } = get();
+        const updated = { ...hiddenProjects };
+        if (updated[projectName]) {
+          delete updated[projectName];
+        } else {
+          updated[projectName] = new Date().toISOString();
+        }
+        set({ hiddenProjects: updated });
+        get().saveConfig();
+      },
+
+      setShowHiddenProjects: (show) => {
+        set({ showHiddenProjects: show });
+      },
+
       // UI State
       toasts: [],
       environmentModal: { isOpen: false },
@@ -78,7 +98,6 @@ export const useStore = create<AppStore>()(
       favoriteNoteModal: { isOpen: false },
       gitPullModal: { isOpen: false },
       settingsModal: { isOpen: false },
-      gitVariablesModal: { isOpen: false },
       deleteEnvironmentModal: { isOpen: false },
       tagManagerModal: { isOpen: false },
       gitOperationsLogModal: { isOpen: false },
@@ -100,6 +119,7 @@ export const useStore = create<AppStore>()(
             environments: config.environments,
             favorites: config.favorites,
             projectNotes: config.projectNotes || {},
+            hiddenProjects: config.hiddenProjects || {},
             isInitialized: true,
           });
 
@@ -128,7 +148,7 @@ export const useStore = create<AppStore>()(
 
       // Save config
       saveConfig: async () => {
-        const { environments, favorites, projectNotes, config, projects, activeEnvironmentId } = get();
+        const { environments, favorites, projectNotes, hiddenProjects, config, projects, activeEnvironmentId } = get();
         if (!config) return;
 
         // Update projects cache for active environment
@@ -145,6 +165,7 @@ export const useStore = create<AppStore>()(
           environments,
           favorites,
           projectNotes,
+          hiddenProjects,
           projectsCache,
         };
 
@@ -212,14 +233,15 @@ export const useStore = create<AppStore>()(
         }
       },
 
-      // Pull all projects
+      // Pull all projects in current environment
       pullAllProjects: async () => {
         const { projects } = get();
-        if (projects.length === 0) {
+        const gitProjects = projects.filter(p => p.hasGit);
+        if (gitProjects.length === 0) {
           get().addToast({
             type: 'warning',
             title: 'Sin proyectos',
-            message: 'No hay proyectos para actualizar',
+            message: 'No hay proyectos Git para actualizar',
           });
           return;
         }
@@ -228,13 +250,9 @@ export const useStore = create<AppStore>()(
         const startTime = Date.now();
         const results = { success: 0, failed: 0 };
 
-        for (const project of projects) {
+        for (const project of gitProjects) {
           try {
-            await invoke('run_git_pull', {
-              repoPath: project.path,
-              username: '',
-              password: ''
-            });
+            await invoke('git_pull', { projectPath: project.path });
             results.success++;
           } catch (error) {
             results.failed++;
@@ -269,7 +287,7 @@ export const useStore = create<AppStore>()(
         await get().scanCurrentEnvironment();
       },
 
-      // Fetch all projects from ALL environments (updates remote info like branch ahead/behind)
+      // Fetch all projects from ALL environments
       fetchAllProjects: async () => {
         const { config } = get();
         if (!config || config.environments.length === 0) {
@@ -288,16 +306,16 @@ export const useStore = create<AppStore>()(
         // Iterate through all environments and their projects
         for (const environment of config.environments) {
           try {
-            const reposResult = await invoke<{ projects: Project[] }>('scan_git_repos', {
+            const envProjects = await invoke<Project[]>('scan_projects', {
               basePath: environment.basePath,
             });
 
-            for (const project of reposResult.projects) {
+            for (const project of envProjects) {
               if (!project.hasGit) continue;
               results.total++;
 
               try {
-                await invoke('git_fetch', { repoPath: project.path });
+                await invoke('git_fetch', { projectPath: project.path });
                 results.success++;
               } catch (error) {
                 results.failed++;
@@ -670,13 +688,6 @@ export const useStore = create<AppStore>()(
         set({ settingsModal: { isOpen: false } });
       },
 
-      openGitVariablesModal: () => {
-        set({ gitVariablesModal: { isOpen: true } });
-      },
-      closeGitVariablesModal: () => {
-        set({ gitVariablesModal: { isOpen: false } });
-      },
-
       openDeleteEnvironmentModal: (data) => {
         set({ deleteEnvironmentModal: { isOpen: true, data } });
       },
@@ -731,6 +742,9 @@ export const useFilteredProjects = () => {
   const favorites = useStore((state) => state.favorites);
   const filters = useStore((state) => state.filters);
   const config = useStore((state) => state.config);
+  const hiddenProjects = useStore((state) => state.hiddenProjects);
+  const showHiddenProjects = useStore((state) => state.showHiddenProjects);
+  const projectTags = useStore((state) => state.projectTags);
 
   // Get showFavoritesFirst from config settings (defaults to true)
   const showFavoritesFirst = config?.settings?.showFavoritesFirst ?? true;
@@ -739,6 +753,11 @@ export const useFilteredProjects = () => {
   return useMemo(() => {
     return projects
       .filter((project) => {
+        // Filter hidden projects when toggle is off
+        if (!showHiddenProjects && hiddenProjects[project.name]) {
+          return false;
+        }
+
         // Filter by favorites
         if (showOnlyFavorites && !favorites[project.name]) {
           return false;
@@ -761,9 +780,28 @@ export const useFilteredProjects = () => {
           }
         }
 
+        // Tags filter
+        if (filters.tags.length > 0) {
+          const pTags = projectTags[project.path] || [];
+          if (!filters.tags.some(tagId => pTags.includes(tagId))) {
+            return false;
+          }
+        }
+
+        // Git-only filter: if filtering by git status, exclude non-git projects
+        if (filters.hasUncommitted === true && !project.hasGit) {
+          return false;
+        }
+
         return true;
       })
       .sort((a, b) => {
+        // Hidden projects always go to the bottom
+        const aHidden = !!hiddenProjects[a.name];
+        const bHidden = !!hiddenProjects[b.name];
+        if (aHidden && !bHidden) return 1;
+        if (!aHidden && bHidden) return -1;
+
         // Only sort favorites first if setting is enabled
         if (showFavoritesFirst) {
           const aFav = favorites[a.name];
@@ -776,5 +814,5 @@ export const useFilteredProjects = () => {
 
         return a.name.localeCompare(b.name);
       });
-  }, [projects, searchQuery, showOnlyFavorites, favorites, filters, showFavoritesFirst]);
+  }, [projects, searchQuery, showOnlyFavorites, favorites, filters, showFavoritesFirst, hiddenProjects, showHiddenProjects, projectTags]);
 };

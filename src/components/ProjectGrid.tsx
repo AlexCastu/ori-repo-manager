@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Star, Folder, Download,
-  Loader2, Filter
+  Loader2, Filter, Eye, EyeOff, GitBranch, RefreshCw
 } from 'lucide-react';
 import { useStore, useFilteredProjects, useActiveEnvironment } from '../store/useStore';
 import { ProjectCardCompact } from './ProjectCardCompact';
@@ -11,6 +11,7 @@ import { AdvancedFiltersPanel } from './AdvancedFiltersPanel';
 import { PullResultsModal, type PullResult } from './PullResultsModal';
 import { cn } from '../utils/helpers';
 import { pullAllProjects as pullAllProjectsApi } from '../utils/tauri';
+import { batchGitFetch } from '../utils/tauriAdvanced';
 import { useDebounce } from '../hooks/useDebounce';
 
 // Number of items to render per batch
@@ -24,11 +25,18 @@ export function ProjectGrid() {
     setShowOnlyFavorites,
     isLoading,
     scanCurrentEnvironment,
-    addToast
+    addToast,
+    hiddenProjects,
+    showHiddenProjects,
+    setShowHiddenProjects,
+    projects,
   } = useStore();
 
   const filteredProjects = useFilteredProjects();
   const activeEnvironment = useActiveEnvironment();
+
+  // Count hidden projects from the full project list
+  const hiddenCount = projects.filter(p => !!hiddenProjects[p.name]).length;
 
   // Local state for immediate input feedback
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
@@ -47,6 +55,7 @@ export function ProjectGrid() {
   }, [searchQuery]);
 
   const [isPullingAll, setIsPullingAll] = useState(false);
+  const [isFetchingAll, setIsFetchingAll] = useState(false);
   const [pullResults, setPullResults] = useState<PullResult[]>([]);
   const [showPullResults, setShowPullResults] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -120,6 +129,37 @@ export function ProjectGrid() {
     }
   };
 
+  // Fetch all projects (only updates remote refs, doesn't modify local)
+  const handleFetchAll = async () => {
+    if (!activeEnvironment || isFetchingAll) return;
+
+    setIsFetchingAll(true);
+    try {
+      const projectPaths = projects.filter(p => p.hasGit).map(p => p.path);
+      if (projectPaths.length === 0) {
+        addToast({ type: 'warning', title: 'Sin proyectos', message: 'No hay proyectos Git para sincronizar' });
+        return;
+      }
+
+      const apiResults = await batchGitFetch(projectPaths);
+      const success = apiResults.filter(([, result]) => 'Ok' in result).length;
+      const failed = apiResults.filter(([, result]) => 'Err' in result).length;
+
+      addToast({
+        type: failed > 0 ? 'warning' : 'success',
+        title: 'Fetch completado',
+        message: `${success} exitosos${failed > 0 ? `, ${failed} fallidos` : ''}`,
+      });
+
+      // Rescan to refresh status indicators
+      await scanCurrentEnvironment(true);
+    } catch {
+      addToast({ type: 'error', title: 'Error', message: 'No se pudo hacer fetch de los proyectos' });
+    } finally {
+      setIsFetchingAll(false);
+    }
+  };
+
   // No environment selected
   if (!activeEnvironment) {
     return (
@@ -132,11 +172,11 @@ export function ProjectGrid() {
           <div
             className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6"
             style={{
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(29, 78, 216, 0.2))',
-              border: '1px solid var(--glass-border)'
+              background: 'linear-gradient(135deg, var(--primary-subtle), var(--primary-muted))',
+              border: '1px solid var(--border)'
             }}
           >
-            <Folder className="w-10 h-10" style={{ color: '#3B82F6' }} />
+            <Folder className="w-10 h-10" style={{ color: 'var(--primary)' }} />
           </div>
           <h2 className="text-2xl font-bold text-theme-primary mb-3">
             Selecciona un Entorno
@@ -153,9 +193,9 @@ export function ProjectGrid() {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header / Filters - with blue gradient */}
       <div
-        className="p-4 relative overflow-hidden border-b border-[var(--glass-border-light)]"
+        className="p-4 relative overflow-hidden border-b border-[var(--border)]"
         style={{
-          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, transparent 70%)'
+          background: 'linear-gradient(135deg, var(--primary-subtle) 0%, transparent 70%)'
         }}
       >
         <div className="flex items-center justify-between mb-3 relative z-10">
@@ -163,20 +203,35 @@ export function ProjectGrid() {
             <h2 className="text-lg font-bold text-theme-primary">{activeEnvironment.name}</h2>
             <p className="text-xs truncate max-w-md text-theme-secondary">{activeEnvironment.basePath}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Fetch All Button */}
+            <button
+              onClick={handleFetchAll}
+              disabled={isFetchingAll || isPullingAll || isLoading}
+              className="btn-secondary flex items-center gap-2"
+              title="Consulta cambios remotos sin modificar tu rama local. Limpia ramas eliminadas en remoto (--prune)"
+            >
+              {isFetchingAll ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <GitBranch className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">Fetch All</span>
+            </button>
+
             {/* Pull All Button */}
             <button
               onClick={handlePullAll}
-              disabled={isPullingAll || isLoading}
+              disabled={isPullingAll || isFetchingAll || isLoading}
               className="btn-primary flex items-center gap-2"
-              title="Pull de todos los proyectos del entorno actual"
+              title="Descarga y aplica los cambios remotos en todos los proyectos (fetch --prune + pull)"
             >
               {isPullingAll ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              <span className="hidden sm:inline">Pull & Fetch All</span>
+              <span className="hidden sm:inline">Pull All</span>
             </button>
           </div>
         </div>
@@ -186,6 +241,7 @@ export function ProjectGrid() {
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-secondary" />
             <input
+              id="search-input"
               type="text"
               placeholder="Buscar proyectos..."
               value={localSearchQuery}
@@ -201,7 +257,7 @@ export function ProjectGrid() {
               'px-3 py-2 rounded-2xl text-sm flex items-center gap-2 transition-all border',
               showOnlyFavorites
                 ? 'bg-amber-500/25 border-amber-500/40 text-amber-600 dark:text-amber-400'
-                : 'bg-theme-elevated border-[var(--glass-border-light)] text-theme-secondary hover:text-theme-primary'
+                : 'bg-[var(--surface)] border-[var(--border)] text-theme-secondary hover:text-theme-primary'
             )}
           >
             <Star className={cn('w-4 h-4', showOnlyFavorites && 'fill-current')} />
@@ -216,8 +272,8 @@ export function ProjectGrid() {
               className={cn(
                 'px-3 py-2 rounded-2xl text-sm flex items-center gap-2 transition-all border',
                 showFilters
-                  ? 'bg-[rgba(59,130,246,0.2)] border-[rgba(59,130,246,0.4)] text-blue-400'
-                  : 'bg-theme-elevated border-[var(--glass-border-light)] text-theme-secondary hover:text-theme-primary'
+                  ? 'bg-[var(--primary-subtle)] border-[var(--primary-muted)] text-[var(--primary)]'
+                  : 'bg-[var(--surface)] border-[var(--border)] text-theme-secondary hover:text-theme-primary'
               )}
             >
               <Filter className="w-4 h-4" />
@@ -270,7 +326,7 @@ export function ProjectGrid() {
               className="flex items-center justify-center h-full"
             >
               <div className="text-center max-w-md">
-                <Search className="w-10 h-10 mx-auto mb-3" style={{ color: '#3B82F6' }} />
+                <Search className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--primary)' }} />
                 <h3 className="text-base font-semibold text-theme-primary mb-2">
                   {searchQuery ? 'Sin resultados' : 'No hay proyectos'}
                 </h3>
@@ -299,7 +355,7 @@ export function ProjectGrid() {
               {/* Load more indicator */}
               {visibleCount < filteredProjects.length && (
                 <div className="py-2 text-center">
-                  <span className="text-xs" style={{ color: '#3B82F6' }}>
+                  <span className="text-xs" style={{ color: 'var(--primary)' }}>
                     Mostrando {visibleCount} de {filteredProjects.length} proyectos
                   </span>
                 </div>
@@ -310,11 +366,11 @@ export function ProjectGrid() {
       </div>
 
       {/* Stats Bar */}
-      {filteredProjects.length > 0 && (
+      {(filteredProjects.length > 0 || hiddenCount > 0) && (
         <div
-          className="px-4 py-2 border-t border-[var(--glass-border-light)]"
+          className="px-4 py-2 border-t border-[var(--border)] flex items-center justify-between"
           style={{
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, transparent 50%)'
+            background: 'linear-gradient(135deg, var(--primary-subtle) 0%, transparent 50%)'
           }}
         >
           <p className="text-xs text-theme-secondary">
@@ -322,6 +378,20 @@ export function ProjectGrid() {
             {showOnlyFavorites && ' favorito'}
             {showOnlyFavorites && filteredProjects.length !== 1 && 's'}
           </p>
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setShowHiddenProjects(!showHiddenProjects)}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all',
+                showHiddenProjects
+                  ? 'text-[var(--primary)] bg-[var(--primary-subtle)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]'
+              )}
+            >
+              {showHiddenProjects ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span>{hiddenCount} oculto{hiddenCount !== 1 ? 's' : ''}</span>
+            </button>
+          )}
         </div>
       )}
     </div>

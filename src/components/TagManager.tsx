@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { X, Plus, Tag as TagIcon, Trash2, AlertTriangle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 interface TagManagerProps {
@@ -23,6 +23,7 @@ export function TagManager({ isOpen, onClose }: TagManagerProps) {
   const { tags, addTag, deleteTag, addToast } = useStore();
   const [newTagName, setNewTagName] = useState('');
   const [selectedColor, setSelectedColor] = useState(colorPresets[0]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -47,16 +48,19 @@ export function TagManager({ isOpen, onClose }: TagManagerProps) {
   };
 
   const handleDeleteTag = (tagId: string) => {
-    const tag = tags[tagId];
-    if (!tag) return;
-
-    if (confirm(`¿Eliminar la etiqueta "${tag.name}"?`)) {
+    if (confirmDeleteId === tagId) {
+      const tag = tags[tagId];
       deleteTag(tagId);
+      setConfirmDeleteId(null);
       addToast({
         type: 'success',
         title: 'Etiqueta eliminada',
-        message: tag.name,
+        message: tag?.name || '',
       });
+    } else {
+      setConfirmDeleteId(tagId);
+      // Auto-cancel after 3 seconds
+      setTimeout(() => setConfirmDeleteId(prev => prev === tagId ? null : prev), 3000);
     }
   };
 
@@ -153,9 +157,18 @@ export function TagManager({ isOpen, onClose }: TagManagerProps) {
                     </div>
                     <button
                       onClick={() => handleDeleteTag(tag.id)}
-                      className="p-2 rounded-lg hover:bg-red-500/20 transition-colors opacity-0 group-hover:opacity-100"
+                      className={`p-2 rounded-lg transition-colors ${
+                        confirmDeleteId === tag.id
+                          ? 'bg-red-500/20 opacity-100'
+                          : 'hover:bg-red-500/20 opacity-0 group-hover:opacity-100'
+                      }`}
+                      title={confirmDeleteId === tag.id ? 'Click de nuevo para confirmar' : 'Eliminar etiqueta'}
                     >
-                      <Trash2 className="w-4 h-4 text-red-400" />
+                      {confirmDeleteId === tag.id ? (
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      )}
                     </button>
                   </motion.div>
                 ))}

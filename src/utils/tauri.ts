@@ -56,33 +56,6 @@ export async function checkPathExists(path: string): Promise<boolean> {
   return invoke<boolean>('check_path_exists', { path });
 }
 
-// Git config variable types and functions
-export interface GitConfigEntry {
-  key: string;
-  value: string;
-}
-
-export async function getGitConfigValue(key: string): Promise<string> {
-  return invoke<string>('get_git_config_value', { key });
-}
-
-export async function setGitConfigValue(key: string, value: string): Promise<void> {
-  return invoke<void>('set_git_config_value', { key, value });
-}
-
-export async function unsetGitConfigValue(key: string): Promise<void> {
-  return invoke<void>('unset_git_config_value', { key });
-}
-
-// Clean all proxy-related git config values
-export async function cleanProxyConfig(): Promise<string[]> {
-  return invoke<string[]>('clean_proxy_config');
-}
-
-export async function listGitConfig(): Promise<GitConfigEntry[]> {
-  return invoke<GitConfigEntry[]>('list_git_config');
-}
-
 export async function getConfigPath(): Promise<string> {
   return invoke<string>('get_config_file_path');
 }
