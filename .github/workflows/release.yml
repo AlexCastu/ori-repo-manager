@@ -6,6 +6,9 @@ on:
       - 'v*-windows'
       - 'v*-macos'
 
+permissions:
+  contents: write
+
 env:
   RUST_BACKTRACE: 1
 
@@ -69,12 +72,19 @@ jobs:
       - name: Build Tauri
         run: npm run tauri:build
 
+      - name: Compress .app bundle
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          for app in *.app; do
+            tar -czf "${app%.app}.app.tar.gz" "$app"
+          done
+
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v1
         with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
           draft: false
           prerelease: false
         env:
