@@ -8,7 +8,7 @@ import { IDE_OPTIONS, IdeIcon } from './IdeIcon';
 import type { AppSettings } from '../types';
 
 export function SettingsModal() {
-  const { settingsModal, closeSettingsModal, config, addToast, saveConfig, initialize } = useStore();
+  const { settingsModal, closeSettingsModal, config, addToast, saveConfig } = useStore();
   useTheme(); // Keep theme context active
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
