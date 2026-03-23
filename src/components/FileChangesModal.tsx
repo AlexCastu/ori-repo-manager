@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { X, FileText, Eye, Plus, Minus, RefreshCw, FileEdit, RotateCcw, Check, Trash2, Send } from 'lucide-react';
 import { getFileChanges, getDiff, gitStageFile, gitStageAll, gitUnstageFile, gitDiscardFile, gitDiscardAll, gitCommit } from '../utils/tauri';
+import { ask } from '@tauri-apps/plugin-dialog';
 import type { FileChange } from '../types';
 
 interface FileChangesModalProps {
@@ -114,7 +115,8 @@ export default function FileChangesModal({
   }
 
   async function handleDiscardFile(filePath: string) {
-    if (!confirm(`¿Descartar cambios en "${filePath}"? Esta acción no se puede deshacer.`)) return;
+    const confirmed = await ask(`¿Descartar cambios en "${filePath}"? Esta acción no se puede deshacer.`, { title: 'Confirmar descarte', kind: 'warning' });
+    if (!confirmed) return;
     setActionLoading(filePath);
     try {
       await gitDiscardFile(projectPath, filePath);

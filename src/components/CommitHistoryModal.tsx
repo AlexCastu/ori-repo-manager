@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, History, User, Calendar, Hash, Search, Copy, Check, Undo2, CopyPlus } from 'lucide-react';
 import { getCommits, gitRevertCommit, gitCherryPick } from '../utils/tauri';
+import { ask } from '@tauri-apps/plugin-dialog';
 import type { GitCommit } from '../types';
 
 interface CommitHistoryModalProps {
@@ -85,7 +86,8 @@ export default function CommitHistoryModal({
   }
 
   async function handleRevert(commit: GitCommit) {
-    if (!confirm(`¿Revertir el commit "${commit.message}" (${commit.short_hash})?`)) return;
+    const confirmed = await ask(`¿Revertir el commit "${commit.message}" (${commit.short_hash})?`, { title: 'Confirmar revert', kind: 'warning' });
+    if (!confirmed) return;
     setActionLoading(commit.hash);
     setActionMessage(null);
     try {
@@ -100,7 +102,8 @@ export default function CommitHistoryModal({
   }
 
   async function handleCherryPick(commit: GitCommit) {
-    if (!confirm(`¿Cherry-pick del commit "${commit.message}" (${commit.short_hash})?`)) return;
+    const confirmed = await ask(`¿Cherry-pick del commit "${commit.message}" (${commit.short_hash})?`, { title: 'Confirmar cherry-pick', kind: 'info' });
+    if (!confirmed) return;
     setActionLoading(commit.hash);
     setActionMessage(null);
     try {
