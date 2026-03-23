@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   Star,
   GitBranch,
@@ -18,7 +19,8 @@ import {
   History,
   Archive,
   FileText,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Plus
 } from 'lucide-react';
 import type { Project, GitStatus } from '../types';
 import { useStore } from '../store/useStore';
@@ -56,6 +58,7 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
   const projectTagIds = useStore((state) => state.projectTags[project.path]) ?? emptyTags;
   const addTagToProject = useStore((state) => state.addTagToProject);
   const removeTagFromProject = useStore((state) => state.removeTagFromProject);
+  const openTagManagerModal = useStore((state) => state.openTagManagerModal);
 
   const setProjectGitStatus = useStore((state) => state.setProjectGitStatus);
 
@@ -140,7 +143,8 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
     if (!project.hasGit || isPushing) return;
     const ahead = gitStatus?.ahead || 0;
     const branch = gitStatus?.branch || 'desconocida';
-    if (!confirm(`¿Push ${ahead} commit${ahead !== 1 ? 's' : ''} a la rama "${branch}"?`)) return;
+    const confirmed = await ask(`¿Push ${ahead} commit${ahead !== 1 ? 's' : ''} a la rama "${branch}"?`, { title: 'Confirmar push', kind: 'info' });
+    if (!confirmed) return;
     setIsPushing(true);
     try {
       const result = await gitPush(project.path);
@@ -505,31 +509,48 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
                 <div className="fixed inset-0 z-[90]" onClick={() => setShowTagDropdown(false)} />
                 <div className="absolute right-0 bottom-full mb-1 w-48 rounded-xl p-2 z-[91] modal-base shadow-lg">
                   {Object.values(tags).length === 0 ? (
-                    <p className="text-xs text-[var(--text-muted)] px-2 py-1">Sin etiquetas creadas</p>
+                    <button
+                      onClick={() => { setShowTagDropdown(false); openTagManagerModal(); }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-[var(--hover-overlay)] transition-colors text-[var(--primary)]"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Crear etiquetas
+                    </button>
                   ) : (
-                    Object.values(tags).map(tag => {
-                      const isAssigned = projectTagIds.includes(tag.id);
-                      return (
+                    <>
+                      {Object.values(tags).map(tag => {
+                        const isAssigned = projectTagIds.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            onClick={() => {
+                              if (isAssigned) {
+                                removeTagFromProject(project.path, tag.id);
+                              } else {
+                                addTagToProject(project.path, tag.id);
+                              }
+                            }}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-[var(--hover-overlay)] transition-colors"
+                          >
+                            <span
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            <span className="truncate text-[var(--text-primary)]">{tag.name}</span>
+                            {isAssigned && <Check className="w-3 h-3 ml-auto text-[var(--primary)]" />}
+                          </button>
+                        );
+                      })}
+                      <div className="border-t border-[var(--border)] mt-1 pt-1">
                         <button
-                          key={tag.id}
-                          onClick={() => {
-                            if (isAssigned) {
-                              removeTagFromProject(project.path, tag.id);
-                            } else {
-                              addTagToProject(project.path, tag.id);
-                            }
-                          }}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-[var(--hover-overlay)] transition-colors"
+                          onClick={() => { setShowTagDropdown(false); openTagManagerModal(); }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-[var(--hover-overlay)] transition-colors text-[var(--text-muted)]"
                         >
-                          <span
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: tag.color }}
-                          />
-                          <span className="truncate text-[var(--text-primary)]">{tag.name}</span>
-                          {isAssigned && <Check className="w-3 h-3 ml-auto text-[var(--primary)]" />}
+                          <Settings className="w-3 h-3" />
+                          Gestionar etiquetas
                         </button>
-                      );
-                    })
+                      </div>
+                    </>
                   )}
                 </div>
               </>
