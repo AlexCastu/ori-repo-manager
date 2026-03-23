@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { AppConfig, Environment, Project, GitStatus, EnvironmentColor, EnvironmentIcon } from '../types';
+import type { AppConfig, Environment, Project, GitStatus, EnvironmentColor, EnvironmentIcon, GitBranch, GitCommit, GitStash, FileChange } from '../types';
 import { defaultEnvironmentColor, defaultEnvironmentIcon } from './colors';
 
 // Tauri command wrappers for type safety
@@ -97,6 +97,7 @@ export function getDefaultConfig(): AppConfig {
       showFavoritesFirst: true,
       autoScanOnStart: true,
       ideCommand: 'code',
+      ultraCompactView: false,
     },
   };
 }
@@ -125,4 +126,102 @@ export function createEnvironment(
     createdAt: now,
     updatedAt: now,
   };
+}
+
+// ==================== EXTENDED GIT OPERATIONS ====================
+
+export async function getBranches(projectPath: string): Promise<GitBranch[]> {
+  return invoke<GitBranch[]>('get_branches', { projectPath });
+}
+
+export async function checkoutBranch(projectPath: string, branchName: string): Promise<string> {
+  return invoke<string>('checkout_branch', { projectPath, branchName });
+}
+
+export async function createBranch(projectPath: string, branchName: string, checkout: boolean = false): Promise<string> {
+  return invoke<string>('create_branch', { projectPath, branchName, checkout });
+}
+
+export async function deleteBranch(projectPath: string, branchName: string, force: boolean = false): Promise<string> {
+  return invoke<string>('delete_branch', { projectPath, branchName, force });
+}
+
+export async function getCommits(projectPath: string, limit: number = 20): Promise<GitCommit[]> {
+  return invoke<GitCommit[]>('get_commits', { projectPath, limit });
+}
+
+export async function getStashList(projectPath: string): Promise<GitStash[]> {
+  return invoke<GitStash[]>('get_stash_list', { projectPath });
+}
+
+export async function stashSave(projectPath: string, message: string): Promise<string> {
+  return invoke<string>('stash_save', { projectPath, message });
+}
+
+export async function stashPop(projectPath: string, index: number): Promise<string> {
+  return invoke<string>('stash_pop', { projectPath, index });
+}
+
+export async function stashDrop(projectPath: string, index: number): Promise<string> {
+  return invoke<string>('stash_drop', { projectPath, index });
+}
+
+export async function getFileChanges(projectPath: string): Promise<FileChange[]> {
+  return invoke<FileChange[]>('get_file_changes', { projectPath });
+}
+
+export async function getDiff(projectPath: string, filePath?: string, staged?: boolean): Promise<string> {
+  return invoke<string>('get_diff', { projectPath, filePath: filePath || null, staged: staged || false });
+}
+
+// ==================== PUSH, STAGE, COMMIT, MERGE ====================
+
+export async function gitPush(projectPath: string, force: boolean = false): Promise<string> {
+  return invoke<string>('git_push', { projectPath, force });
+}
+
+export async function gitStageFile(projectPath: string, filePath: string): Promise<string> {
+  return invoke<string>('git_stage_file', { projectPath, filePath });
+}
+
+export async function gitStageAll(projectPath: string): Promise<string> {
+  return invoke<string>('git_stage_all', { projectPath });
+}
+
+export async function gitUnstageFile(projectPath: string, filePath: string): Promise<string> {
+  return invoke<string>('git_unstage_file', { projectPath, filePath });
+}
+
+export async function gitDiscardFile(projectPath: string, filePath: string): Promise<string> {
+  return invoke<string>('git_discard_file', { projectPath, filePath });
+}
+
+export async function gitDiscardAll(projectPath: string): Promise<string> {
+  return invoke<string>('git_discard_all', { projectPath });
+}
+
+export async function gitCommit(projectPath: string, message: string): Promise<string> {
+  return invoke<string>('git_commit', { projectPath, message });
+}
+
+export async function gitMergeBranch(projectPath: string, branchName: string): Promise<string> {
+  return invoke<string>('git_merge_branch', { projectPath, branchName });
+}
+
+export async function gitRevertCommit(projectPath: string, commitHash: string): Promise<string> {
+  return invoke<string>('git_revert_commit', { projectPath, commitHash });
+}
+
+export async function gitCherryPick(projectPath: string, commitHash: string): Promise<string> {
+  return invoke<string>('git_cherry_pick', { projectPath, commitHash });
+}
+
+// ==================== CONFIG EXPORT/IMPORT ====================
+
+export async function exportConfigFile(configJson: string): Promise<string> {
+  return invoke<string>('export_config_file', { configJson });
+}
+
+export async function importConfigFile(): Promise<string> {
+  return invoke<string>('import_config_file');
 }

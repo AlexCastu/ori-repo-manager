@@ -37,7 +37,7 @@ export function useAutoSync() {
         });
 
         if (updates.length > 0 && autoSyncConfig.notifyOnUpdates) {
-          // Request permission for notifications
+          // Mostrar notificación nativa si hay permiso
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('Actualizaciones disponibles', {
               body: `${updates.length} repositorio${updates.length !== 1 ? 's tienen' : ' tiene'} nuevos commits`,
@@ -82,10 +82,6 @@ export function useAutoSync() {
     return () => clearInterval(interval);
   }, [autoSyncConfig, projects, activeEnvironment]);
 
-  // Request notification permission on mount
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
+  // La solicitud de permisos de notificación se hace en el primer auto-sync
+  // (no al montar), porque los navegadores exigen un gesto de usuario.
 }

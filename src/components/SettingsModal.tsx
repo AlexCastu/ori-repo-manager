@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings, Star, RefreshCw, Save, FolderOpen, Palette, Copy, CheckCircle2, Sun, Moon, Monitor, Code } from 'lucide-react';
+import { X, Settings, Star, RefreshCw, Save, FolderOpen, Palette, Copy, CheckCircle2, Sun, Moon, Monitor, Code, Download, Upload } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useTheme } from '../contexts/ThemeContext';
-import { getConfigPath } from '../utils/tauri';
+import { getConfigPath, exportConfigFile, importConfigFile } from '../utils/tauri';
 import { IDE_OPTIONS, IdeIcon } from './IdeIcon';
 import type { AppSettings } from '../types';
 
@@ -76,6 +76,60 @@ export function SettingsModal() {
       useStore.setState({ config: { ...config, settings: originalSettingsRef.current } });
     }
     closeSettingsModal();
+  };
+
+  const handleExportConfig = async () => {
+    if (!config) return;
+    try {
+      const configJson = JSON.stringify(config, null, 2);
+      const path = await exportConfigFile(configJson);
+      addToast({
+        type: 'success',
+        title: 'Configuración Exportada',
+        message: `Guardado en: ${path}`,
+      });
+    } catch (error) {
+      const errorMsg = String(error);
+      if (errorMsg !== 'Operación cancelada') {
+        addToast({
+          type: 'error',
+          title: 'Error al exportar',
+          message: errorMsg || 'No se pudo exportar la configuración',
+        });
+      }
+    }
+  };
+
+  const handleImportConfig = async () => {
+    try {
+      const configJson = await importConfigFile();
+      const importedConfig = JSON.parse(configJson);
+
+      // Validate that it's a valid config structure
+      if (!importedConfig.version || !importedConfig.environments || !importedConfig.settings) {
+        throw new Error('El archivo no contiene una configuración válida');
+      }
+
+      useStore.setState({ config: importedConfig });
+      await saveConfig();
+
+      addToast({
+        type: 'success',
+        title: 'Configuración Importada',
+        message: 'La configuración se ha importado correctamente. Recarga la página para aplicar todos los cambios.',
+      });
+
+      closeSettingsModal();
+    } catch (error) {
+      const errorMsg = String(error);
+      if (errorMsg !== 'Operación cancelada') {
+        addToast({
+          type: 'error',
+          title: 'Error al importar',
+          message: errorMsg || 'No se pudo importar la configuración',
+        });
+      }
+    }
   };
 
   if (!settingsModal.isOpen || !settings) return null;
@@ -199,6 +253,24 @@ export function SettingsModal() {
                       />
                     </button>
                   </div>
+
+                  {/* Ultra Compact View */}
+                  <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'var(--surface-alt)' }}>
+                    <div className="flex items-center gap-3">
+                      <FolderOpen className="w-4 h-4" style={{ color: 'var(--primary)' }} />
+                      <span className="text-sm text-theme-secondary">Vista ultra compacta</span>
+                    </div>
+                    <button
+                      onClick={() => setSettings({ ...settings, ultraCompactView: !settings.ultraCompactView })}
+                      className="relative w-11 h-6 rounded-full transition-colors"
+                      style={{ backgroundColor: settings.ultraCompactView ? 'var(--primary)' : '#4b5563' }}
+                    >
+                      <span
+                        className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                        style={{ left: settings.ultraCompactView ? '1.5rem' : '0.25rem' }}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* IDE Configuration */}
@@ -273,6 +345,32 @@ export function SettingsModal() {
                         </button>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* Export/Import Config */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-theme-secondary">
+                    <Download className="w-4 h-4" style={{ color: 'var(--primary)' }} />
+                    Backup de Configuración
+                  </div>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleExportConfig}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                      style={{ background: 'var(--primary-subtle)', color: 'var(--primary)' }}
+                    >
+                      <Download className="w-4 h-4" />
+                      Exportar Configuración
+                    </button>
+                    <button
+                      onClick={handleImportConfig}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-colors"
+                      style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                    >
+                      <Upload className="w-4 h-4" />
+                      Importar Configuración
+                    </button>
                   </div>
                 </div>
 
