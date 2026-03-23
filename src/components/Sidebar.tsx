@@ -20,7 +20,8 @@ import {
   Zap,
   Box,
   Layers,
-  Settings
+  Settings,
+  Tag as TagIcon
 } from 'lucide-react';
 import { useStore, useEnvironments, useActiveEnvironment } from '../store/useStore';
 import { cn } from '../utils/helpers';
@@ -57,6 +58,7 @@ export function Sidebar() {
     openEnvironmentModal,
     openCloneModal,
     openSettingsModal,
+    openTagManagerModal,
     scanCurrentEnvironment,
     triggerRefresh,
     isLoading,
@@ -300,6 +302,14 @@ export function Sidebar() {
       </div>
 
       <div className={isCollapsed ? 'p-2 border-t border-[var(--glass-border-light)]' : 'p-4 border-t border-[var(--glass-border-light)] space-y-1'}>
+        <button
+          onClick={() => openTagManagerModal()}
+          className={`sidebar-item w-full ${isCollapsed ? 'justify-center p-2' : ''}`}
+          title={isCollapsed ? 'Etiquetas' : undefined}
+        >
+          <TagIcon className="w-5 h-5" />
+          {!isCollapsed && <span>Etiquetas</span>}
+        </button>
         <button
           onClick={() => openSettingsModal()}
           className={`sidebar-item w-full ${isCollapsed ? 'justify-center p-2' : ''}`}
