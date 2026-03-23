@@ -76,6 +76,8 @@ export interface AppConfig {
   favorites: Record<string, Favorite>;
   projectNotes: Record<string, string>; // Notas independientes de favoritos
   hiddenProjects: Record<string, string>; // key=projectName, value=hiddenAt ISO date
+  tags: Record<string, ProjectTag>;
+  projectTags: Record<string, string[]>;
   projectsCache: Record<string, Record<string, Project>>;
   settings: AppSettings;
 }
