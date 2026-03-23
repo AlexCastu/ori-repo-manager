@@ -507,7 +507,7 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
             {showTagDropdown && (
               <>
                 <div className="fixed inset-0 z-[90]" onClick={() => setShowTagDropdown(false)} />
-                <div className="absolute right-0 bottom-full mb-1 w-48 rounded-xl p-2 z-[91] modal-base shadow-lg">
+                <div className="absolute right-0 bottom-full mb-1 w-48 rounded-xl p-2 z-[91] modal-base shadow-lg max-h-64 overflow-y-auto">
                   {Object.values(tags).length === 0 ? (
                     <button
                       onClick={() => { setShowTagDropdown(false); openTagManagerModal(); }}
