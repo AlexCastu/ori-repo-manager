@@ -33,3 +33,11 @@ src-tauri/WixTools/
 *.AppImage
 *.deb
 *.rpm
+
+# Agent files
+.claude/
+.github/agents/
+.codex/
+AGENTS.md
+AGENTE_DEV.md
+agente.md

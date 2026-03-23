@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { Download, RefreshCw, X, Check, GitBranch } from 'lucide-react';
+import { Download, RefreshCw, X, Check, GitBranch, Upload } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { batchGitPull, batchGitFetch } from '../utils/tauriAdvanced';
+import { batchGitPull, batchGitFetch, batchGitPush } from '../utils/tauriAdvanced';
 import { useState } from 'react';
 import { PullResultsModal, type PullResult } from './PullResultsModal';
 
@@ -9,6 +9,7 @@ export function BatchActionsBar() {
   const { selectedProjects, deselectAllProjects, addToast, triggerRefresh } = useStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
   const [pullResults, setPullResults] = useState<PullResult[]>([]);
   const [showResultsModal, setShowResultsModal] = useState(false);
 
@@ -90,6 +91,34 @@ export function BatchActionsBar() {
     }
   };
 
+  const handleBatchPush = async () => {
+    if (!confirm(`¿Push en ${selectedCount} proyecto${selectedCount !== 1 ? 's' : ''}? Se enviarán los commits locales a los remotos.`)) return;
+    setIsPushing(true);
+
+    try {
+      const apiResults = await batchGitPush(selectedPaths);
+
+      const success = apiResults.filter(([, result]) => 'Ok' in result).length;
+      const failed = apiResults.filter(([, result]) => 'Err' in result).length;
+
+      addToast({
+        type: failed > 0 ? 'warning' : 'success',
+        title: 'Push completado',
+        message: `${success} exitosos, ${failed} fallidos`,
+      });
+
+      triggerRefresh();
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo hacer push de los repositorios',
+      });
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
   return (
     <>
       <motion.div
@@ -118,7 +147,7 @@ export function BatchActionsBar() {
           {/* Pull Selected */}
           <button
             onClick={handleBatchPull}
-            disabled={isProcessing || isFetching}
+            disabled={isProcessing || isFetching || isPushing}
             className="btn-primary flex items-center gap-2 px-4 py-2"
             title="Descarga los cambios remotos y actualiza tu rama local (fetch + merge)"
           >
@@ -133,7 +162,7 @@ export function BatchActionsBar() {
           {/* Fetch Selected */}
           <button
             onClick={handleBatchFetch}
-            disabled={isProcessing || isFetching}
+            disabled={isProcessing || isFetching || isPushing}
             className="btn-secondary flex items-center gap-2 px-4 py-2"
             title="Consulta los cambios remotos sin modificar tu rama local (solo actualiza referencias)"
           >
@@ -143,6 +172,21 @@ export function BatchActionsBar() {
               <GitBranch className="w-4 h-4" />
             )}
             <span>Fetch</span>
+          </button>
+
+          {/* Push Selected */}
+          <button
+            onClick={handleBatchPush}
+            disabled={isProcessing || isFetching || isPushing}
+            className="btn-secondary flex items-center gap-2 px-4 py-2"
+            title="Envía los commits locales a los repositorios remotos"
+          >
+            {isPushing ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            <span>Push</span>
           </button>
 
           <div className="h-8 w-px bg-[var(--border)]" />

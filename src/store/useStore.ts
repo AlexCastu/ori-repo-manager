@@ -46,11 +46,15 @@ export const useStore = create<AppStore>()(
         branches: [],
         tags: [],
         hasUncommitted: null,
+        sortBy: 'name',
       },
 
       // Tags
       tags: {},
       projectTags: {},
+
+      // Centralized Git Statuses
+      gitStatuses: {},
 
       // Git Operations History
       gitOperations: [],
@@ -479,6 +483,7 @@ export const useStore = create<AppStore>()(
             branches: [],
             tags: [],
             hasUncommitted: null,
+            sortBy: 'name',
           }
         });
       },
@@ -554,6 +559,13 @@ export const useStore = create<AppStore>()(
         };
         set((state) => ({
           gitOperations: [operation, ...state.gitOperations].slice(0, 100) // Keep last 100
+        }));
+      },
+
+      // Centralized Git Status
+      setProjectGitStatus: (projectPath, status) => {
+        set((state) => ({
+          gitStatuses: { ...state.gitStatuses, [projectPath]: status }
         }));
       },
 
@@ -745,6 +757,7 @@ export const useFilteredProjects = () => {
   const hiddenProjects = useStore((state) => state.hiddenProjects);
   const showHiddenProjects = useStore((state) => state.showHiddenProjects);
   const projectTags = useStore((state) => state.projectTags);
+  const gitStatuses = useStore((state) => state.gitStatuses);
 
   // Get showFavoritesFirst from config settings (defaults to true)
   const showFavoritesFirst = config?.settings?.showFavoritesFirst ?? true;
@@ -788,9 +801,26 @@ export const useFilteredProjects = () => {
           }
         }
 
-        // Git-only filter: if filtering by git status, exclude non-git projects
-        if (filters.hasUncommitted === true && !project.hasGit) {
-          return false;
+        const status = gitStatuses[project.path];
+
+        // Git status filter
+        if (filters.gitStatus !== 'all' && project.hasGit && status) {
+          if (filters.gitStatus === 'with-changes' && !status.has_changes && status.ahead === 0 && status.behind === 0) return false;
+          if (filters.gitStatus === 'up-to-date' && (status.has_changes || status.ahead > 0 || status.behind > 0)) return false;
+          if (filters.gitStatus === 'ahead' && status.ahead === 0) return false;
+          if (filters.gitStatus === 'behind' && status.behind === 0) return false;
+        }
+
+        // Branch filter
+        if (filters.branches.length > 0 && project.hasGit) {
+          if (!status || !filters.branches.includes(status.branch)) {
+            return false;
+          }
+        }
+
+        // Uncommitted changes filter
+        if (filters.hasUncommitted === true) {
+          if (!project.hasGit || !status || !status.has_changes) return false;
         }
 
         return true;
@@ -812,7 +842,23 @@ export const useFilteredProjects = () => {
           if (aFav && bFav) return aFav.order - bFav.order;
         }
 
+        // Sort by selected criteria
+        if (filters.sortBy === 'status') {
+          const aStatus = gitStatuses[a.path];
+          const bStatus = gitStatuses[b.path];
+          const aScore = (aStatus?.has_changes ? 3 : 0) + ((aStatus?.ahead ?? 0) > 0 ? 2 : 0) + ((aStatus?.behind ?? 0) > 0 ? 1 : 0);
+          const bScore = (bStatus?.has_changes ? 3 : 0) + ((bStatus?.ahead ?? 0) > 0 ? 2 : 0) + ((bStatus?.behind ?? 0) > 0 ? 1 : 0);
+          if (bScore !== aScore) return bScore - aScore;
+        }
+
+        if (filters.sortBy === 'branch') {
+          const aBranch = gitStatuses[a.path]?.branch || '';
+          const bBranch = gitStatuses[b.path]?.branch || '';
+          const branchCmp = aBranch.localeCompare(bBranch);
+          if (branchCmp !== 0) return branchCmp;
+        }
+
         return a.name.localeCompare(b.name);
       });
-  }, [projects, searchQuery, showOnlyFavorites, favorites, filters, showFavoritesFirst, hiddenProjects, showHiddenProjects, projectTags]);
+  }, [projects, searchQuery, showOnlyFavorites, favorites, filters, showFavoritesFirst, hiddenProjects, showHiddenProjects, projectTags, gitStatuses]);
 };

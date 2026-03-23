@@ -13,3 +13,7 @@ export { TagManager } from './TagManager';
 export { GitOperationsLog } from './GitOperationsLog';
 export { IdeIcon, IDE_OPTIONS, IDE_INSTALL_INSTRUCTIONS, getIdeLabel } from './IdeIcon';
 export { PullResultsModal } from './PullResultsModal';
+export { default as BranchSelectorModal } from './BranchSelectorModal';
+export { default as CommitHistoryModal } from './CommitHistoryModal';
+export { default as StashManagerModal } from './StashManagerModal';
+export { default as FileChangesModal } from './FileChangesModal';
