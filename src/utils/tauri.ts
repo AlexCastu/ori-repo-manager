@@ -90,6 +90,8 @@ export function getDefaultConfig(): AppConfig {
     favorites: {},
     projectNotes: {},
     hiddenProjects: {},
+    tags: {},
+    projectTags: {},
     projectsCache: {},
     settings: {
       theme: 'dark',

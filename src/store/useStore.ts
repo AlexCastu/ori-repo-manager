@@ -124,6 +124,8 @@ export const useStore = create<AppStore>()(
             favorites: config.favorites,
             projectNotes: config.projectNotes || {},
             hiddenProjects: config.hiddenProjects || {},
+            tags: config.tags || {},
+            projectTags: config.projectTags || {},
             isInitialized: true,
           });
 
@@ -152,7 +154,7 @@ export const useStore = create<AppStore>()(
 
       // Save config
       saveConfig: async () => {
-        const { environments, favorites, projectNotes, hiddenProjects, config, projects, activeEnvironmentId } = get();
+        const { environments, favorites, projectNotes, hiddenProjects, tags, projectTags, config, projects, activeEnvironmentId } = get();
         if (!config) return;
 
         // Update projects cache for active environment
@@ -170,6 +172,8 @@ export const useStore = create<AppStore>()(
           favorites,
           projectNotes,
           hiddenProjects,
+          tags,
+          projectTags,
           projectsCache,
         };
 
