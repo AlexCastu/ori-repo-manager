@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   Star,
   GitBranch,
@@ -142,7 +143,8 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
     if (!project.hasGit || isPushing) return;
     const ahead = gitStatus?.ahead || 0;
     const branch = gitStatus?.branch || 'desconocida';
-    if (!confirm(`¿Push ${ahead} commit${ahead !== 1 ? 's' : ''} a la rama "${branch}"?`)) return;
+    const confirmed = await ask(`¿Push ${ahead} commit${ahead !== 1 ? 's' : ''} a la rama "${branch}"?`, { title: 'Confirmar push', kind: 'info' });
+    if (!confirmed) return;
     setIsPushing(true);
     try {
       const result = await gitPush(project.path);

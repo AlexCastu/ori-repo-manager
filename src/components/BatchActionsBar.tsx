@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { ask } from '@tauri-apps/plugin-dialog';
 import { Download, RefreshCw, X, Check, GitBranch, Upload } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { batchGitPull, batchGitFetch, batchGitPush } from '../utils/tauriAdvanced';
@@ -92,7 +93,8 @@ export function BatchActionsBar() {
   };
 
   const handleBatchPush = async () => {
-    if (!confirm(`¿Push en ${selectedCount} proyecto${selectedCount !== 1 ? 's' : ''}? Se enviarán los commits locales a los remotos.`)) return;
+    const confirmed = await ask(`¿Push en ${selectedCount} proyecto${selectedCount !== 1 ? 's' : ''}? Se enviarán los commits locales a los remotos.`, { title: 'Confirmar push masivo', kind: 'warning' });
+    if (!confirmed) return;
     setIsPushing(true);
 
     try {

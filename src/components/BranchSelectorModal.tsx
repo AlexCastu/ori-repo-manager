@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, GitBranch, Plus, Trash2, Check, GitMerge } from 'lucide-react';
 import { getBranches, checkoutBranch, createBranch, deleteBranch, gitMergeBranch } from '../utils/tauri';
+import { ask } from '@tauri-apps/plugin-dialog';
 import type { GitBranch as GitBranchType } from '../types';
 
 interface BranchSelectorModalProps {
@@ -85,7 +86,8 @@ export default function BranchSelectorModal({
   }
 
   async function handleDeleteBranch(branchName: string) {
-    if (!confirm(`¿Eliminar rama "${branchName}"?`)) return;
+    const confirmed = await ask(`¿Eliminar rama "${branchName}"?`, { title: 'Confirmar eliminación', kind: 'warning' });
+    if (!confirmed) return;
 
     setLoading(true);
     setError(null);
@@ -100,7 +102,8 @@ export default function BranchSelectorModal({
   }
 
   async function handleMergeBranch(branchName: string) {
-    if (!confirm(`¿Mergear "${branchName}" en la rama actual?`)) return;
+    const confirmed = await ask(`¿Mergear "${branchName}" en la rama actual?`, { title: 'Confirmar merge', kind: 'info' });
+    if (!confirmed) return;
 
     setLoading(true);
     setError(null);

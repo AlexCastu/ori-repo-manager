@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Archive, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { getStashList, stashSave, stashPop, stashDrop } from '../utils/tauri';
+import { ask } from '@tauri-apps/plugin-dialog';
 import type { GitStash } from '../types';
 
 interface StashManagerModalProps {
@@ -70,7 +71,8 @@ export default function StashManagerModal({
   }
 
   async function handlePopStash(index: number) {
-    if (!confirm('¿Aplicar este stash? Se aplicarán los cambios guardados al directorio de trabajo.')) return;
+    const confirmed = await ask('¿Aplicar este stash? Se aplicarán los cambios guardados al directorio de trabajo.', { title: 'Aplicar stash', kind: 'info' });
+    if (!confirmed) return;
 
     setLoading(true);
     setError(null);
@@ -90,7 +92,8 @@ export default function StashManagerModal({
   }
 
   async function handleDropStash(index: number) {
-    if (!confirm('¿Eliminar este stash permanentemente?')) return;
+    const confirmed = await ask('¿Eliminar este stash permanentemente?', { title: 'Confirmar eliminación', kind: 'warning' });
+    if (!confirmed) return;
 
     setLoading(true);
     setError(null);
