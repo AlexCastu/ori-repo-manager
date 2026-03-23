@@ -14,14 +14,25 @@ import {
   Copy,
   Link as LinkIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  History,
+  Archive,
+  FileText,
+  Tag as TagIcon
 } from 'lucide-react';
 import type { Project, GitStatus } from '../types';
 import { useStore } from '../store/useStore';
 import { cn } from '../utils/helpers';
-import { openInIDE, openInExplorer, getGitStatus } from '../utils/tauri';
+import { openInIDE, openInExplorer, getGitStatus, gitPush } from '../utils/tauri';
 import { PlatformIcon } from './PlatformIcon';
 import { IdeIcon, getIdeLabel } from './IdeIcon';
+import BranchSelectorModal from './BranchSelectorModal';
+import CommitHistoryModal from './CommitHistoryModal';
+import StashManagerModal from './StashManagerModal';
+import FileChangesModal from './FileChangesModal';
+
+// Referencia estable para evitar re-renders infinitos cuando no hay tags
+const emptyTags: string[] = [];
 
 interface ProjectCardCompactProps {
   project: Project;
@@ -41,9 +52,21 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
   const toggleProjectSelection = useStore((state) => state.toggleProjectSelection);
   const hiddenProjects = useStore((state) => state.hiddenProjects);
   const toggleHideProject = useStore((state) => state.toggleHideProject);
+  const tags = useStore((state) => state.tags);
+  const projectTagIds = useStore((state) => state.projectTags[project.path]) ?? emptyTags;
+  const addTagToProject = useStore((state) => state.addTagToProject);
+  const removeTagFromProject = useStore((state) => state.removeTagFromProject);
+
+  const setProjectGitStatus = useStore((state) => state.setProjectGitStatus);
 
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [showCommitModal, setShowCommitModal] = useState(false);
+  const [showStashModal, setShowStashModal] = useState(false);
+  const [showFileChangesModal, setShowFileChangesModal] = useState(false);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
 
   const isFavorite = !!favorites[project.name];
   const projectNote = projectNotes[project.name] || '';
@@ -51,6 +74,7 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
   const isSelected = selectedProjects.has(project.path);
   const isHidden = !!hiddenProjects[project.name];
   const ideCommand = config?.settings?.ideCommand || 'code';
+  const ultraCompact = config?.settings?.ultraCompactView || false;
 
   useEffect(() => {
     let isMounted = true;
@@ -65,7 +89,10 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
         setIsLoadingStatus(true);
         try {
           const status = await getGitStatus(project.path);
-          if (isMounted) setGitStatus(status);
+          if (isMounted) {
+            setGitStatus(status);
+            setProjectGitStatus(project.path, status);
+          }
         } catch (error) {
           console.error('Failed to get git status:', error);
         } finally {
@@ -76,7 +103,7 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
 
     loadStatus();
     return () => { isMounted = false; };
-  }, [project.path, project.hasGit, refreshTrigger]);
+  }, [project.path, project.hasGit, refreshTrigger, setProjectGitStatus]);
 
   const handleOpenIDE = async () => {
     try {
@@ -109,6 +136,37 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
     openGitPullModal({ projectPath: project.path, projectName: project.name });
   };
 
+  const handlePush = async () => {
+    if (!project.hasGit || isPushing) return;
+    const ahead = gitStatus?.ahead || 0;
+    const branch = gitStatus?.branch || 'desconocida';
+    if (!confirm(`¿Push ${ahead} commit${ahead !== 1 ? 's' : ''} a la rama "${branch}"?`)) return;
+    setIsPushing(true);
+    try {
+      const result = await gitPush(project.path);
+      addToast({ type: 'success', title: 'Push exitoso', message: result });
+      await refreshStatus();
+    } catch (err) {
+      addToast({ type: 'error', title: 'Error en Push', message: String(err) });
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
+  const refreshStatus = async () => {
+    if (!project.hasGit) return;
+    setIsLoadingStatus(true);
+    try {
+      const status = await getGitStatus(project.path);
+      setGitStatus(status);
+      setProjectGitStatus(project.path, status);
+    } catch (error) {
+      console.error('Failed to refresh git status:', error);
+    } finally {
+      setIsLoadingStatus(false);
+    }
+  };
+
   const hasCommitsToPush = gitStatus && gitStatus.ahead > 0;
   const hasCommitsToPull = gitStatus && gitStatus.behind > 0;
   const hasUncommittedChanges = gitStatus && gitStatus.has_changes;
@@ -117,17 +175,21 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
   return (
     <div
       className={cn(
-        'group relative flex flex-col gap-1.5 px-4 py-3 rounded-xl transition-all duration-200 project-card',
+        'group relative flex flex-col rounded-xl transition-all duration-200 project-card',
+        ultraCompact ? 'gap-1 px-3 py-2' : 'gap-1.5 px-4 py-3',
         isSelected && 'selected',
         isHidden && 'opacity-50'
       )}
     >
       {/* ── ROW 1: Identity & Status ────────────────────────── */}
-      <div className="flex items-center gap-2.5">
+      <div className={cn('flex items-center', ultraCompact ? 'gap-2' : 'gap-2.5')}>
         {/* Checkbox */}
         <button
           onClick={(e) => { e.stopPropagation(); toggleProjectSelection(project.path); }}
-          className="flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+          className={cn(
+            'flex-shrink-0 rounded-md border-2 flex items-center justify-center transition-all',
+            ultraCompact ? 'w-4 h-4' : 'w-5 h-5'
+          )}
           style={{
             borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
             backgroundColor: isSelected ? 'var(--primary)' : 'transparent',
@@ -168,17 +230,44 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
           {project.name}
         </h3>
 
-        {/* Branch Badge */}
+        {/* Branch Badge (clickable) */}
         {gitStatus?.branch && (
-          <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md text-xs flex-shrink-0 bg-[var(--surface-alt)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+          <button
+            onClick={() => setShowBranchModal(true)}
+            className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md text-xs flex-shrink-0 bg-[var(--surface-alt)] text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors"
+            title="Gestionar ramas"
+          >
             <GitBranch className="w-3 h-3" />
             <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
-          </span>
+          </button>
         )}
 
         {/* Note dot indicator */}
         {hasNote && (
           <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title={projectNote} />
+        )}
+
+        {/* Tag pills */}
+        {projectTagIds.length > 0 && (
+          <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+            {projectTagIds.slice(0, 3).map(tagId => {
+              const tag = tags[tagId];
+              if (!tag) return null;
+              return (
+                <span
+                  key={tagId}
+                  className="px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate max-w-[80px]"
+                  style={{ backgroundColor: tag.color }}
+                  title={tag.name}
+                >
+                  {tag.name}
+                </span>
+              );
+            })}
+            {projectTagIds.length > 3 && (
+              <span className="text-[10px] text-[var(--text-muted)]">+{projectTagIds.length - 3}</span>
+            )}
+          </div>
         )}
 
         {/* Spacer */}
@@ -210,14 +299,24 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
                 </span>
               )}
 
+              {gitStatus?.has_conflicts && (
+                <span
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                  title="Conflictos de merge pendientes"
+                >
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>!</span>
+                </span>
+              )}
+
               {hasCommitsToPush && (
                 <span
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
                   style={{ background: 'var(--primary-subtle)', color: 'var(--primary)' }}
-                  title={`${gitStatus!.ahead} commits para push`}
+                  title={`${gitStatus?.ahead ?? 0} commits para push`}
                 >
                   <Upload className="w-3 h-3" />
-                  <span>{gitStatus!.ahead}</span>
+                  <span>{gitStatus?.ahead ?? 0}</span>
                 </span>
               )}
 
@@ -225,10 +324,10 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
                 <span
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
                   style={{ background: 'var(--success-subtle)', color: 'var(--success-text)' }}
-                  title={`${gitStatus!.behind} commits para pull`}
+                  title={`${gitStatus?.behind ?? 0} commits para pull`}
                 >
                   <Download className="w-3 h-3" />
-                  <span>{gitStatus!.behind}</span>
+                  <span>{gitStatus?.behind ?? 0}</span>
                 </span>
               )}
 
@@ -305,12 +404,57 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
 
           {project.hasGit && (
             <button
-              onClick={() => openGitConfigModal({ projectPath: project.path, projectName: project.name })}
-              className="p-2 rounded-lg transition-all duration-150 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
-              title="Git Config"
+              onClick={handlePush}
+              disabled={isPushing}
+              className={cn(
+                'p-2 rounded-lg transition-all duration-150 hover:bg-[var(--hover-overlay)]',
+                isPushing && 'animate-pulse',
+                hasCommitsToPush
+                  ? 'text-[var(--primary)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              )}
+              title={hasCommitsToPush ? `Push (${gitStatus?.ahead ?? 0} commits)` : 'Git Push'}
             >
-              <Settings className="w-4 h-4" />
+              <Upload className="w-4 h-4" />
             </button>
+          )}
+
+          {project.hasGit && (
+            <>
+              <button
+                onClick={() => setShowFileChangesModal(true)}
+                className={cn(
+                  'p-2 rounded-lg transition-all duration-150 hover:bg-[var(--hover-overlay)]',
+                  hasUncommittedChanges
+                    ? 'text-[var(--warning)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                )}
+                title="Ver archivos modificados"
+              >
+                <FileText className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowCommitModal(true)}
+                className="p-2 rounded-lg transition-all duration-150 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
+                title="Historial de commits"
+              >
+                <History className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowStashModal(true)}
+                className="p-2 rounded-lg transition-all duration-150 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
+                title="Gestionar stashes"
+              >
+                <Archive className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => openGitConfigModal({ projectPath: project.path, projectName: project.name })}
+                className="p-2 rounded-lg transition-all duration-150 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
+                title="Git Config"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </>
           )}
 
           <button
@@ -341,8 +485,91 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
           >
             {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
+
+          {/* Tag assignment button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTagDropdown(!showTagDropdown)}
+              className={cn(
+                'p-2 rounded-lg transition-all duration-150',
+                projectTagIds.length > 0
+                  ? 'text-blue-500 hover:bg-blue-500/10'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]'
+              )}
+              title="Asignar etiquetas"
+            >
+              <TagIcon className="w-4 h-4" />
+            </button>
+            {showTagDropdown && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowTagDropdown(false)} />
+                <div className="absolute right-0 bottom-full mb-1 w-48 rounded-xl p-2 z-[91] modal-base shadow-lg">
+                  {Object.values(tags).length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)] px-2 py-1">Sin etiquetas creadas</p>
+                  ) : (
+                    Object.values(tags).map(tag => {
+                      const isAssigned = projectTagIds.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          onClick={() => {
+                            if (isAssigned) {
+                              removeTagFromProject(project.path, tag.id);
+                            } else {
+                              addTagToProject(project.path, tag.id);
+                            }
+                          }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-[var(--hover-overlay)] transition-colors"
+                        >
+                          <span
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          <span className="truncate text-[var(--text-primary)]">{tag.name}</span>
+                          {isAssigned && <Check className="w-3 h-3 ml-auto text-[var(--primary)]" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Modals */}
+      {project.hasGit && (
+        <>
+          <BranchSelectorModal
+            isOpen={showBranchModal}
+            onClose={() => setShowBranchModal(false)}
+            projectPath={project.path}
+            projectName={project.name}
+            onBranchChanged={refreshStatus}
+          />
+          <CommitHistoryModal
+            isOpen={showCommitModal}
+            onClose={() => setShowCommitModal(false)}
+            projectPath={project.path}
+            projectName={project.name}
+          />
+          <StashManagerModal
+            isOpen={showStashModal}
+            onClose={() => setShowStashModal(false)}
+            projectPath={project.path}
+            projectName={project.name}
+            onStashChanged={refreshStatus}
+          />
+          <FileChangesModal
+            isOpen={showFileChangesModal}
+            onClose={() => setShowFileChangesModal(false)}
+            projectPath={project.path}
+            projectName={project.name}
+            onChangesUpdated={refreshStatus}
+          />
+        </>
+      )}
     </div>
   );
 });

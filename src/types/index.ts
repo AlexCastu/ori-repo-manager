@@ -63,6 +63,7 @@ export interface Favorite {
 // Git Status from Rust backend
 export interface GitStatus {
   has_changes: boolean;
+  has_conflicts: boolean;
   ahead: number;
   behind: number;
   branch: string;
@@ -85,6 +86,7 @@ export interface AppSettings {
   showFavoritesFirst: boolean;
   autoScanOnStart: boolean;
   ideCommand: string;
+  ultraCompactView: boolean;
 }
 
 export type GitPlatform = 'github' | 'gitlab' | 'bitbucket' | 'azure' | 'other';
@@ -129,6 +131,7 @@ export interface ProjectFilters {
   branches: string[];
   tags: string[];
   hasUncommitted: boolean | null;
+  sortBy: 'name' | 'status' | 'branch';
 }
 
 export interface ToastMessage {
@@ -268,6 +271,9 @@ export type AppStore = EnvironmentsSlice & ProjectsSlice & FavoritesSlice & Proj
   deleteTag: (tagId: string) => void;
   addTagToProject: (projectPath: string, tagId: string) => void;
   removeTagFromProject: (projectPath: string, tagId: string) => void;
+  // Centralized Git Statuses
+  gitStatuses: Record<string, GitStatus>;
+  setProjectGitStatus: (projectPath: string, status: GitStatus) => void;
   // Git Operations History
   gitOperations: GitOperation[];
   addGitOperation: (operation: Omit<GitOperation, 'id' | 'timestamp'>) => void;
@@ -281,3 +287,33 @@ export type AppStore = EnvironmentsSlice & ProjectsSlice & FavoritesSlice & Proj
   pullAllProjects: () => Promise<void>;
   fetchAllProjects: () => Promise<void>;
 };
+
+// ==================== EXTENDED GIT TYPES ====================
+
+export interface GitBranch {
+  name: string;
+  is_current: boolean;
+  is_remote: boolean;
+  tracking: string | null;
+}
+
+export interface GitCommit {
+  hash: string;
+  short_hash: string;
+  author: string;
+  email: string;
+  date: string;
+  message: string;
+}
+
+export interface GitStash {
+  index: number;
+  branch: string;
+  message: string;
+}
+
+export interface FileChange {
+  path: string;
+  status: string;
+  staged: boolean;
+}

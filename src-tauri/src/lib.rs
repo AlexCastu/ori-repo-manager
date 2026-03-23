@@ -1,3 +1,4 @@
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -8,6 +9,9 @@ use walkdir::WalkDir;
 
 mod git_advanced;
 use git_advanced::*;
+
+mod git_extended;
+use git_extended::*;
 
 // ==================== TYPES ====================
 
@@ -71,6 +75,8 @@ pub struct AppSettings {
     pub auto_scan_on_start: bool,
     #[serde(rename = "ideCommand", default = "default_ide_command")]
     pub ide_command: String,
+    #[serde(rename = "ultraCompactView", default)]
+    pub ultra_compact_view: bool,
 }
 
 fn default_ide_command() -> String {
@@ -97,8 +103,8 @@ pub struct AppConfig {
 // ==================== HELPER FUNCTIONS ====================
 
 fn get_config_path() -> Result<std::path::PathBuf, String> {
-    let app_data = dirs::config_dir()
-        .ok_or_else(|| "Could not find config directory".to_string())?;
+    let app_data =
+        dirs::config_dir().ok_or_else(|| "Could not find config directory".to_string())?;
     let config_dir = app_data.join("ORI-RepoManager");
 
     // Create directory if it doesn't exist
@@ -124,6 +130,7 @@ fn get_default_config() -> AppConfig {
             show_favorites_first: true,
             auto_scan_on_start: true,
             ide_command: "code".to_string(),
+            ultra_compact_view: false,
         },
         extra: HashMap::new(),
     }
@@ -169,6 +176,54 @@ fn get_git_remote(project_path: &str) -> Option<String> {
     None
 }
 
+// ==================== VALIDATION HELPERS ====================
+
+/// Valida que la ruta sea un repositorio Git válido
+pub fn validate_git_repo(path: &str) -> Result<(), String> {
+    let p = Path::new(path);
+    if !p.exists() {
+        return Err(format!("La ruta no existe: {}", path));
+    }
+    if !p.join(".git").exists() {
+        return Err(format!("No es un repositorio Git válido: {}", path));
+    }
+    Ok(())
+}
+
+/// Valida que el nombre de rama sea seguro para Git
+pub fn validate_branch_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("El nombre de rama no puede estar vacío".to_string());
+    }
+    if name.starts_with('-') || name.starts_with('.') {
+        return Err("El nombre de rama no puede empezar con '-' o '.'".to_string());
+    }
+    if name.ends_with('.') || name.ends_with(".lock") {
+        return Err("El nombre de rama no puede terminar en '.' o '.lock'".to_string());
+    }
+    let prohibited = ["..", "~", "^", ":", "\\", "@{", "[", " ", "\t"];
+    for ch in &prohibited {
+        if name.contains(ch) {
+            return Err(format!(
+                "El nombre de rama contiene caracteres no permitidos: '{}'",
+                ch
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Crea backup del archivo de configuración
+fn backup_config() -> Result<(), String> {
+    let config_path = get_config_path()?;
+    if config_path.exists() {
+        let backup_path = config_path.with_extension("backup.json");
+        fs::copy(&config_path, &backup_path)
+            .map_err(|e| format!("Error creando backup de config: {}", e))?;
+    }
+    Ok(())
+}
+
 // ==================== TAURI COMMANDS ====================
 
 #[tauri::command]
@@ -176,9 +231,11 @@ async fn scan_projects(base_path: String) -> Result<Vec<Project>, String> {
     let base = Path::new(&base_path);
 
     if !base.exists() {
-        return Err(format!("Path does not exist: {}", base_path));
+        error!("Ruta no encontrada al escanear: {}", base_path);
+        return Err(format!("La ruta no existe: {}", base_path));
     }
 
+    info!("Escaneando proyectos en: {}", base_path);
     let mut projects: Vec<Project> = Vec::new();
     let now = chrono::Local::now().to_rfc3339();
 
@@ -192,7 +249,8 @@ async fn scan_projects(base_path: String) -> Result<Vec<Project>, String> {
         let path = entry.path();
 
         if path.is_dir() {
-            let name = path.file_name()
+            let name = path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown")
                 .to_string();
@@ -241,22 +299,32 @@ pub fn apply_no_window(_cmd: &mut Command) {
 }
 
 /// Run a Command with a timeout. Returns the Output or an error if it times out.
-pub fn run_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<std::process::Output, String> {
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn process: {}", e))?;
+pub fn run_with_timeout(
+    cmd: &mut Command,
+    timeout: Duration,
+) -> Result<std::process::Output, String> {
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
     let start = std::time::Instant::now();
     loop {
         match child.try_wait() {
             Ok(Some(_status)) => {
                 // Process finished — collect output
-                let output = child.wait_with_output().map_err(|e| format!("Failed to read output: {}", e))?;
+                let output = child
+                    .wait_with_output()
+                    .map_err(|e| format!("Failed to read output: {}", e))?;
                 return Ok(output);
             }
             Ok(None) => {
                 if start.elapsed() > timeout {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err("Operación cancelada: tiempo de espera agotado (sin conectividad?)".to_string());
+                    return Err(
+                        "Operación cancelada: tiempo de espera agotado (sin conectividad?)"
+                            .to_string(),
+                    );
                 }
                 std::thread::sleep(Duration::from_millis(200));
             }
@@ -275,6 +343,24 @@ async fn get_git_remote_url(project_path: String) -> Result<Option<String>, Stri
 
 #[tauri::command]
 async fn git_clone(repo_url: String, destination: String) -> Result<String, String> {
+    // Validar formato básico de URL
+    let url_trimmed = repo_url.trim();
+    if url_trimmed.is_empty() {
+        return Err("La URL del repositorio no puede estar vacía".to_string());
+    }
+    if !(url_trimmed.starts_with("https://")
+        || url_trimmed.starts_with("http://")
+        || url_trimmed.starts_with("git@")
+        || url_trimmed.starts_with("ssh://")
+        || url_trimmed.starts_with("git://"))
+    {
+        return Err(
+            "URL no válida. Debe empezar con https://, http://, git@, ssh:// o git://".to_string(),
+        );
+    }
+
+    info!("Clonando repositorio: {} → {}", repo_url, destination);
+
     let dest = Path::new(&destination);
 
     // Ensure destination directory exists
@@ -283,11 +369,8 @@ async fn git_clone(repo_url: String, destination: String) -> Result<String, Stri
             .map_err(|e| format!("No se pudo crear el directorio destino: {}", e))?;
     }
 
-    // Run `git clone <url>` inside the destination directory.
-    // Git will create a subfolder with the repo name automatically.
     let mut cmd = Command::new("git");
-    cmd.current_dir(&destination)
-        .args(["clone", &repo_url]);
+    cmd.current_dir(&destination).args(["clone", &repo_url]);
     apply_no_window(&mut cmd);
 
     // Clone can take longer — use 120 second timeout
@@ -296,49 +379,160 @@ async fn git_clone(repo_url: String, destination: String) -> Result<String, Stri
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        // git clone prints progress to stderr, so include both
-        Ok(if stdout.is_empty() { stderr } else { format!("{}\n{}", stdout, stderr) })
+        info!("Clone completado: {}", repo_url);
+        Ok(if stdout.is_empty() {
+            stderr
+        } else {
+            format!("{}\n{}", stdout, stderr)
+        })
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let err = String::from_utf8_lossy(&output.stderr).to_string();
+        error!("Clone fallido para {}: {}", repo_url, err);
+        Err(err)
     }
 }
 
 #[tauri::command]
 async fn git_pull(project_path: String) -> Result<String, String> {
-    // First, fetch all branches from all remotes
+    validate_git_repo(&project_path)?;
+    info!("Pull iniciado en: {}", project_path);
+
+    // Obtener rama actual
+    let mut branch_cmd = Command::new("git");
+    branch_cmd
+        .current_dir(&project_path)
+        .args(["rev-parse", "--abbrev-ref", "HEAD"]);
+    apply_no_window(&mut branch_cmd);
+    let branch = branch_cmd
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|_| "desconocida".to_string());
+
+    // Guardar HEAD actual para comparar después
+    let mut head_cmd = Command::new("git");
+    head_cmd
+        .current_dir(&project_path)
+        .args(["rev-parse", "HEAD"]);
+    apply_no_window(&mut head_cmd);
+    let old_head = head_cmd
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+
+    // Fetch all remotes
     let mut fetch_cmd = Command::new("git");
-    fetch_cmd.current_dir(&project_path)
+    fetch_cmd
+        .current_dir(&project_path)
         .args(["fetch", "--all", "--prune"]);
     apply_no_window(&mut fetch_cmd);
-
     let fetch_output = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT)?;
+    let fetch_info = String::from_utf8_lossy(&fetch_output.stderr).to_string();
 
-    // Then, pull the current branch
+    // Pull (fast-forward only)
     let mut pull_cmd = Command::new("git");
-    pull_cmd.current_dir(&project_path)
-        .args(["pull"]);
+    pull_cmd
+        .current_dir(&project_path)
+        .args(["pull", "--ff-only"]);
     apply_no_window(&mut pull_cmd);
-
     let pull_output = run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT)?;
 
-    if pull_output.status.success() {
-        let fetch_msg = String::from_utf8_lossy(&fetch_output.stdout);
-        let pull_msg = String::from_utf8_lossy(&pull_output.stdout);
-        Ok(format!("Fetch: {}\n\nPull: {}", fetch_msg, pull_msg))
-    } else {
-        Err(String::from_utf8_lossy(&pull_output.stderr).to_string())
+    if !pull_output.status.success() {
+        let err = String::from_utf8_lossy(&pull_output.stderr).to_string();
+        error!(
+            "Pull fallido en {} (rama {}): {}",
+            project_path, branch, err
+        );
+        return Err(err);
     }
+
+    let pull_stdout = String::from_utf8_lossy(&pull_output.stdout).to_string();
+    let up_to_date =
+        pull_stdout.contains("Already up to date") || pull_stdout.contains("Already up-to-date");
+
+    let mut log = format!("📌 Rama: {}\n", branch);
+
+    if !fetch_info.trim().is_empty() {
+        log.push_str(&format!("🔄 Fetch: {}\n", fetch_info.trim()));
+    }
+
+    if up_to_date {
+        log.push_str("✅ Ya estás al día — sin cambios nuevos.\n");
+        info!(
+            "Pull completado (sin cambios) en: {} [{}]",
+            project_path, branch
+        );
+    } else {
+        log.push_str("✅ Pull completado con cambios nuevos:\n\n");
+
+        // Estadísticas: qué archivos cambiaron
+        if !old_head.is_empty() {
+            let mut stat_cmd = Command::new("git");
+            stat_cmd.current_dir(&project_path).args([
+                "diff",
+                "--stat",
+                &format!("{}..HEAD", old_head),
+            ]);
+            apply_no_window(&mut stat_cmd);
+
+            if let Ok(stat_out) = stat_cmd.output() {
+                let stats = String::from_utf8_lossy(&stat_out.stdout).to_string();
+                if !stats.trim().is_empty() {
+                    log.push_str("📊 Archivos modificados:\n");
+                    log.push_str(&stats);
+                    log.push('\n');
+                }
+            }
+
+            // Commits recibidos
+            let mut shortlog_cmd = Command::new("git");
+            shortlog_cmd.current_dir(&project_path).args([
+                "log",
+                "--oneline",
+                &format!("{}..HEAD", old_head),
+            ]);
+            apply_no_window(&mut shortlog_cmd);
+
+            if let Ok(shortlog_out) = shortlog_cmd.output() {
+                let commits = String::from_utf8_lossy(&shortlog_out.stdout).to_string();
+                if !commits.trim().is_empty() {
+                    let count = commits.lines().count();
+                    log.push_str(&format!(
+                        "📋 {} commit{} recibido{}:\n",
+                        count,
+                        if count != 1 { "s" } else { "" },
+                        if count != 1 { "s" } else { "" }
+                    ));
+                    log.push_str(&commits);
+                }
+            }
+        }
+
+        info!(
+            "Pull completado con cambios en: {} [{}]",
+            project_path, branch
+        );
+    }
+
+    Ok(log)
 }
 
 #[tauri::command]
 async fn git_config(project_path: String, name: String, email: String) -> Result<(), String> {
+    validate_git_repo(&project_path)?;
+    info!(
+        "Configurando git user en: {} (name={}, email={})",
+        project_path, name, email
+    );
+
     // Set user.name
     let mut cmd_name = Command::new("git");
-    cmd_name.current_dir(&project_path)
+    cmd_name
+        .current_dir(&project_path)
         .args(["config", "user.name", &name]);
     apply_no_window(&mut cmd_name);
 
-    let output_name = cmd_name.output()
+    let output_name = cmd_name
+        .output()
         .map_err(|e| format!("Failed to set user.name: {}", e))?;
 
     if !output_name.status.success() {
@@ -347,11 +541,13 @@ async fn git_config(project_path: String, name: String, email: String) -> Result
 
     // Set user.email
     let mut cmd_email = Command::new("git");
-    cmd_email.current_dir(&project_path)
+    cmd_email
+        .current_dir(&project_path)
         .args(["config", "user.email", &email]);
     apply_no_window(&mut cmd_email);
 
-    let output_email = cmd_email.output()
+    let output_email = cmd_email
+        .output()
         .map_err(|e| format!("Failed to set user.email: {}", e))?;
 
     if !output_email.status.success() {
@@ -369,16 +565,15 @@ async fn load_config() -> Result<AppConfig, String> {
         let default_config = get_default_config();
         let json = serde_json::to_string_pretty(&default_config)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
-        fs::write(&config_path, json)
-            .map_err(|e| format!("Failed to write config: {}", e))?;
+        fs::write(&config_path, json).map_err(|e| format!("Failed to write config: {}", e))?;
         return Ok(default_config);
     }
 
-    let content = fs::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read config: {}", e))?;
+    let content =
+        fs::read_to_string(&config_path).map_err(|e| format!("Failed to read config: {}", e))?;
 
-    let config: AppConfig = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse config: {}", e))?;
+    let config: AppConfig =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse config: {}", e))?;
 
     Ok(config)
 }
@@ -387,12 +582,17 @@ async fn load_config() -> Result<AppConfig, String> {
 async fn save_config(config: AppConfig) -> Result<(), String> {
     let config_path = get_config_path()?;
 
+    // Crear backup antes de guardar
+    if let Err(e) = backup_config() {
+        warn!("No se pudo crear backup de config: {}", e);
+    }
+
     let json = serde_json::to_string_pretty(&config)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
 
-    fs::write(&config_path, json)
-        .map_err(|e| format!("Failed to write config: {}", e))?;
+    fs::write(&config_path, json).map_err(|e| format!("Failed to write config: {}", e))?;
 
+    info!("Configuración guardada correctamente");
     Ok(())
 }
 
@@ -413,16 +613,15 @@ pub struct PullResult {
 
 #[tauri::command]
 async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String> {
-    use std::thread;
     use std::sync::{Arc, Mutex};
+    use std::thread;
 
     let base = Path::new(&base_path);
     if !base.exists() {
         return Err(format!("Base path does not exist: {}", base_path));
     }
 
-    let entries = fs::read_dir(base)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries = fs::read_dir(base).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     // Collect all git project paths first
     let projects: Vec<(String, std::path::PathBuf)> = entries
@@ -430,7 +629,8 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
         .filter_map(|entry| {
             let path = entry.path();
             if path.is_dir() && path.join(".git").exists() {
-                let name = path.file_name()
+                let name = path
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown")
                     .to_string();
@@ -445,55 +645,88 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
 
     // Process in parallel chunks of 4
     for chunk in projects.chunks(4) {
-        let handles: Vec<_> = chunk.iter().map(|(name, path)| {
-            let project_name = name.clone();
-            let project_path = path.clone();
-            let results = Arc::clone(&results);
+        let handles: Vec<_> = chunk
+            .iter()
+            .map(|(name, path)| {
+                let project_name = name.clone();
+                let project_path = path.clone();
+                let results = Arc::clone(&results);
 
-            thread::spawn(move || {
-                // First: fetch --all --prune (clean stale remote branches)
-                let mut fetch_cmd = Command::new("git");
-                fetch_cmd.current_dir(&project_path)
-                    .args(["fetch", "--all", "--prune"]);
-                apply_no_window(&mut fetch_cmd);
-                let _ = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT);
+                thread::spawn(move || {
+                    // First: fetch --all --prune (clean stale remote branches)
+                    let mut fetch_cmd = Command::new("git");
+                    fetch_cmd
+                        .current_dir(&project_path)
+                        .args(["fetch", "--all", "--prune"]);
+                    apply_no_window(&mut fetch_cmd);
+                    let _ = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT);
 
-                // Then: pull
-                let mut pull_cmd = Command::new("git");
-                pull_cmd.current_dir(&project_path).args(["pull"]);
-                apply_no_window(&mut pull_cmd);
+                    // Then: pull (fast-forward only, no forced merge)
+                    let mut pull_cmd = Command::new("git");
+                    pull_cmd
+                        .current_dir(&project_path)
+                        .args(["pull", "--ff-only"]);
+                    apply_no_window(&mut pull_cmd);
 
-                let result = match run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT) {
-                    Ok(out) => {
-                        if out.status.success() {
-                            let msg = String::from_utf8_lossy(&out.stdout).to_string();
-                            PullResult {
-                                project_name,
-                                success: true,
-                                message: if msg.contains("Already up to date") {
-                                    "Ya actualizado".to_string()
+                    let result = match run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT) {
+                        Ok(out) => {
+                            if out.status.success() {
+                                let msg = String::from_utf8_lossy(&out.stdout).to_string();
+                                if msg.contains("Already up to date")
+                                    || msg.contains("Already up-to-date")
+                                {
+                                    PullResult {
+                                        project_name,
+                                        success: true,
+                                        message: "Ya actualizado".to_string(),
+                                    }
                                 } else {
-                                    "Actualizado correctamente".to_string()
-                                },
-                            }
-                        } else {
-                            PullResult {
-                                project_name,
-                                success: false,
-                                message: String::from_utf8_lossy(&out.stderr).to_string(),
+                                    // Obtener estadísticas del pull
+                                    let mut stat_cmd = Command::new("git");
+                                    stat_cmd.current_dir(&project_path).args([
+                                        "diff",
+                                        "--stat",
+                                        "HEAD@{1}..HEAD",
+                                    ]);
+                                    apply_no_window(&mut stat_cmd);
+
+                                    let detail = stat_cmd
+                                        .output()
+                                        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                                        .unwrap_or_default();
+
+                                    let summary = if detail.trim().is_empty() {
+                                        "Actualizado correctamente".to_string()
+                                    } else {
+                                        let last_line = detail.lines().last().unwrap_or("").trim();
+                                        format!("Actualizado: {}", last_line)
+                                    };
+
+                                    PullResult {
+                                        project_name,
+                                        success: true,
+                                        message: summary,
+                                    }
+                                }
+                            } else {
+                                PullResult {
+                                    project_name,
+                                    success: false,
+                                    message: String::from_utf8_lossy(&out.stderr).to_string(),
+                                }
                             }
                         }
-                    }
-                    Err(e) => PullResult {
-                        project_name,
-                        success: false,
-                        message: e,
-                    },
-                };
+                        Err(e) => PullResult {
+                            project_name,
+                            success: false,
+                            message: e,
+                        },
+                    };
 
-                results.lock().unwrap().push(result);
+                    results.lock().unwrap().push(result);
+                })
             })
-        }).collect();
+            .collect();
 
         for handle in handles {
             let _ = handle.join();
@@ -537,7 +770,10 @@ async fn open_in_ide(project_path: String, ide_command: String) -> Result<(), St
             }
 
             let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
-            let vscode_path_alt = format!("{}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe", user_profile);
+            let vscode_path_alt = format!(
+                "{}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+                user_profile
+            );
 
             if Path::new(&vscode_path_alt).exists() {
                 let mut cmd = Command::new(&vscode_path_alt);
@@ -549,7 +785,10 @@ async fn open_in_ide(project_path: String, ide_command: String) -> Result<(), St
             }
         }
 
-        return Err(format!("IDE '{}' not found. Please ensure it's installed and in PATH.", ide_command));
+        return Err(format!(
+            "IDE '{}' not found. Please ensure it's installed and in PATH.",
+            ide_command
+        ));
     }
 
     #[cfg(target_os = "macos")]
@@ -595,10 +834,7 @@ async fn open_in_ide(project_path: String, ide_command: String) -> Result<(), St
 
         // Try common paths for Cursor on macOS
         if ide_command == "cursor" {
-            let cursor_paths = vec![
-                "/usr/local/bin/cursor",
-                "/opt/homebrew/bin/cursor",
-            ];
+            let cursor_paths = vec!["/usr/local/bin/cursor", "/opt/homebrew/bin/cursor"];
 
             for path in cursor_paths {
                 if Path::new(path).exists() {
@@ -609,7 +845,10 @@ async fn open_in_ide(project_path: String, ide_command: String) -> Result<(), St
             }
         }
 
-        return Err(format!("IDE '{}' not found. Please ensure it's installed and the command is in your PATH.", ide_command));
+        return Err(format!(
+            "IDE '{}' not found. Please ensure it's installed and the command is in your PATH.",
+            ide_command
+        ));
     }
 
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
@@ -660,6 +899,7 @@ async fn open_in_explorer(project_path: String) -> Result<(), String> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitStatus {
     pub has_changes: bool,
+    pub has_conflicts: bool,
     pub ahead: i32,
     pub behind: i32,
     pub branch: String,
@@ -668,32 +908,56 @@ pub struct GitStatus {
 
 #[tauri::command]
 async fn get_git_status(project_path: String) -> Result<GitStatus, String> {
+    validate_git_repo(&project_path)?;
+
     // Get current branch
     let mut branch_cmd = Command::new("git");
-    branch_cmd.current_dir(&project_path)
+    branch_cmd
+        .current_dir(&project_path)
         .args(["rev-parse", "--abbrev-ref", "HEAD"]);
     apply_no_window(&mut branch_cmd);
 
-    let branch_output = branch_cmd.output()
+    let branch_output = branch_cmd
+        .output()
         .map_err(|e| format!("Failed to get branch: {}", e))?;
 
-    let branch = String::from_utf8_lossy(&branch_output.stdout).trim().to_string();
+    let branch = String::from_utf8_lossy(&branch_output.stdout)
+        .trim()
+        .to_string();
 
     // Check for uncommitted changes
     let mut status_cmd = Command::new("git");
-    status_cmd.current_dir(&project_path)
+    status_cmd
+        .current_dir(&project_path)
         .args(["status", "--porcelain"]);
     apply_no_window(&mut status_cmd);
 
-    let status_output = status_cmd.output()
+    let status_output = status_cmd
+        .output()
         .map_err(|e| format!("Failed to get status: {}", e))?;
 
-    let has_changes = !status_output.stdout.is_empty();
+    let status_text = String::from_utf8_lossy(&status_output.stdout);
+    let has_changes = !status_text.is_empty();
+
+    // M7: Detectar conflictos de merge (UU, AA, DD, AU, UA, DU, UD)
+    let has_conflicts = status_text.lines().any(|line| {
+        if line.len() >= 2 {
+            let x = &line[0..1];
+            let y = &line[1..2];
+            x == "U" || y == "U" || (x == "A" && y == "A") || (x == "D" && y == "D")
+        } else {
+            false
+        }
+    });
 
     // Get ahead/behind count
     let mut ahead_cmd = Command::new("git");
-    ahead_cmd.current_dir(&project_path)
-        .args(["rev-list", "--left-right", "--count", &format!("HEAD...origin/{}", branch)]);
+    ahead_cmd.current_dir(&project_path).args([
+        "rev-list",
+        "--left-right",
+        "--count",
+        &format!("HEAD...origin/{}", branch),
+    ]);
     apply_no_window(&mut ahead_cmd);
 
     let ahead_behind = ahead_cmd.output();
@@ -703,10 +967,7 @@ async fn get_git_status(project_path: String) -> Result<GitStatus, String> {
             let counts = String::from_utf8_lossy(&output.stdout);
             let parts: Vec<&str> = counts.trim().split('\t').collect();
             if parts.len() == 2 {
-                (
-                    parts[0].parse().unwrap_or(0),
-                    parts[1].parse().unwrap_or(0),
-                )
+                (parts[0].parse().unwrap_or(0), parts[1].parse().unwrap_or(0))
             } else {
                 (0, 0)
             }
@@ -714,8 +975,15 @@ async fn get_git_status(project_path: String) -> Result<GitStatus, String> {
         Err(_) => (0, 0),
     };
 
-    let status_message = if has_changes && ahead > 0 && behind > 0 {
-        format!("⚠️ {} cambios, ↑{} ↓{}", if has_changes { "+" } else { "" }, ahead, behind)
+    let status_message = if has_conflicts {
+        "⚠️ Conflictos de merge pendientes".to_string()
+    } else if has_changes && ahead > 0 && behind > 0 {
+        format!(
+            "⚠️ {} cambios, ↑{} ↓{}",
+            if has_changes { "+" } else { "" },
+            ahead,
+            behind
+        )
     } else if has_changes {
         "⚠️ Cambios sin commit".to_string()
     } else if ahead > 0 && behind > 0 {
@@ -730,6 +998,7 @@ async fn get_git_status(project_path: String) -> Result<GitStatus, String> {
 
     Ok(GitStatus {
         has_changes,
+        has_conflicts,
         ahead,
         behind,
         branch,
@@ -739,6 +1008,9 @@ async fn get_git_status(project_path: String) -> Result<GitStatus, String> {
 
 #[tauri::command]
 async fn git_fetch(project_path: String) -> Result<String, String> {
+    validate_git_repo(&project_path)?;
+    info!("Fetch iniciado en: {}", project_path);
+
     let mut cmd = Command::new("git");
     cmd.current_dir(&project_path)
         .args(["fetch", "--all", "--prune"]);
@@ -747,9 +1019,12 @@ async fn git_fetch(project_path: String) -> Result<String, String> {
     let output = run_with_timeout(&mut cmd, GIT_NETWORK_TIMEOUT)?;
 
     if output.status.success() {
+        info!("Fetch completado en: {}", project_path);
         Ok("Fetch completado".to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let err = String::from_utf8_lossy(&output.stderr).to_string();
+        error!("Fetch fallido en {}: {}", project_path, err);
+        Err(err)
     }
 }
 
@@ -762,6 +1037,55 @@ async fn select_directory(app: tauri::AppHandle) -> Result<Option<String>, Strin
     match result {
         Some(path) => Ok(Some(path.to_string())),
         None => Ok(None),
+    }
+}
+
+#[tauri::command]
+async fn export_config_file(app: tauri::AppHandle, config_json: String) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let result = app
+        .dialog()
+        .file()
+        .set_file_name("ori-config-backup.json")
+        .add_filter("JSON", &["json"])
+        .blocking_save_file();
+
+    match result {
+        Some(path) => {
+            let path_str = path.to_string();
+            fs::write(&path_str, config_json)
+                .map_err(|e| format!("Error al guardar archivo: {}", e))?;
+            Ok(path_str)
+        }
+        None => Err("Operación cancelada".to_string()),
+    }
+}
+
+#[tauri::command]
+async fn import_config_file(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let result = app
+        .dialog()
+        .file()
+        .add_filter("JSON", &["json"])
+        .blocking_pick_file();
+
+    match result {
+        Some(path) => {
+            let path_str = path.to_string();
+            let content = fs::read_to_string(&path_str)
+                .map_err(|e| format!("Error al leer archivo: {}", e))?;
+            // S4: Validar estructura JSON antes de devolver
+            let parsed: serde_json::Value = serde_json::from_str(&content)
+                .map_err(|e| format!("El archivo no contiene JSON válido: {}", e))?;
+            if !parsed.is_object() || parsed.get("environments").is_none() {
+                return Err("El archivo no tiene la estructura de configuración esperada (falta campo: environments)".to_string());
+            }
+            Ok(content)
+        }
+        None => Err("Operación cancelada".to_string()),
     }
 }
 
@@ -779,13 +1103,16 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            let log_level = if cfg!(debug_assertions) {
+                log::LevelFilter::Debug
+            } else {
+                log::LevelFilter::Info
+            };
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log_level)
+                    .build(),
+            )?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -803,10 +1130,36 @@ pub fn run() {
             open_in_ide,
             open_in_explorer,
             select_directory,
+            export_config_file,
+            import_config_file,
             check_path_exists,
             // Batch Git Operations
             batch_git_fetch,
             batch_git_pull,
+            batch_git_push,
+            // Extended Git Operations
+            get_branches,
+            checkout_branch,
+            create_branch,
+            delete_branch,
+            get_commits,
+            get_stash_list,
+            stash_save,
+            stash_pop,
+            stash_drop,
+            get_file_changes,
+            get_diff,
+            // Push, Stage, Commit, Merge
+            git_push,
+            git_stage_file,
+            git_stage_all,
+            git_unstage_file,
+            git_discard_file,
+            git_discard_all,
+            git_commit,
+            git_merge_branch,
+            git_revert_commit,
+            git_cherry_pick,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
