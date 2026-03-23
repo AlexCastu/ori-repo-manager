@@ -30,9 +30,15 @@ export function AdvancedFiltersPanel({ isOpen, onClose, buttonRef }: AdvancedFil
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
+      const panelMaxHeight = window.innerHeight - 120;
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const fitsBelow = spaceBelow >= Math.min(panelMaxHeight, 400);
+
       setPosition({
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.right + window.scrollX - 320 // 320px = ancho del panel
+        top: fitsBelow
+          ? rect.bottom + window.scrollY + 8
+          : Math.max(8, rect.top + window.scrollY - Math.min(panelMaxHeight, 400)),
+        left: rect.right + window.scrollX - 320
       });
     }
   }, [isOpen, buttonRef]);
@@ -88,12 +94,14 @@ export function AdvancedFiltersPanel({ isOpen, onClose, buttonRef }: AdvancedFil
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="fixed w-80 rounded-2xl p-4 z-[101] modal-base"
+        className="fixed w-80 rounded-2xl z-[101] modal-base flex flex-col"
         style={{
           top: `${position.top}px`,
           left: `${position.left}px`,
+          maxHeight: 'calc(100vh - 120px)',
         }}
       >
+        <div className="overflow-y-auto flex-1 p-4 pb-0">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-theme-primary font-medium flex items-center gap-2">
@@ -247,23 +255,26 @@ export function AdvancedFiltersPanel({ isOpen, onClose, buttonRef }: AdvancedFil
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-4 border-t border-[var(--glass-border-light)]">
-              <button
-                onClick={() => {
-                  resetFilters();
-                  onClose();
-                }}
-                className="flex-1 btn-secondary"
-              >
-                Limpiar
-              </button>
-              <button
-                onClick={onClose}
-                className="flex-1 btn-primary"
-              >
-                Aplicar
-              </button>
+            <div className="sticky bottom-0 bg-[var(--glass-bg)] pt-2 pb-4 -mx-4 px-4">
+              <div className="flex gap-2 pt-4 border-t border-[var(--glass-border-light)]">
+                <button
+                  onClick={() => {
+                    resetFilters();
+                    onClose();
+                  }}
+                  className="flex-1 btn-secondary"
+                >
+                  Limpiar
+                </button>
+                <button
+                  onClick={onClose}
+                  className="flex-1 btn-primary"
+                >
+                  Aplicar
+                </button>
+              </div>
             </div>
+          </div>
           </motion.div>
     </>,
     document.body

@@ -253,14 +253,14 @@ export const ProjectCardCompact = memo(function ProjectCardCompact({ project }: 
 
         {/* Tag pills */}
         {projectTagIds.length > 0 && (
-          <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-1 flex-shrink-0 ml-1">
             {projectTagIds.slice(0, 3).map(tagId => {
               const tag = tags[tagId];
               if (!tag) return null;
               return (
                 <span
                   key={tagId}
-                  className="px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate max-w-[80px]"
+                  className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium text-white truncate max-w-[80px]"
                   style={{ backgroundColor: tag.color }}
                   title={tag.name}
                 >
