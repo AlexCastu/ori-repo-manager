@@ -536,10 +536,17 @@ async fn git_pull(project_path: String) -> Result<String, String> {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default();
 
-    // Único acceso a red: fetch de todos los remotos
+    // Único acceso a red: fetch de todos los remotos.
+    // Si falla (sin conexión, credenciales, remoto caído) hay que abortar:
+    // el merge local diría "al día" sin haber comprobado nada.
     let mut fetch_cmd = git_network_cmd(&project_path);
     fetch_cmd.args(["fetch", "--all", "--prune"]);
     let fetch_output = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT)?;
+    if !fetch_output.status.success() {
+        let err = String::from_utf8_lossy(&fetch_output.stderr).to_string();
+        error!("Fetch fallido en {}: {}", project_path, err);
+        return Err(format!("No se pudo consultar el remoto:\n{}", err.trim()));
+    }
     let fetch_info = String::from_utf8_lossy(&fetch_output.stderr).to_string();
 
     // Avanzar la rama actual al upstream ya descargado (sin red, solo fast-forward)
@@ -788,16 +795,29 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
                 thread::spawn(move || {
                     let path_str = project_path.to_string_lossy().to_string();
 
-                    // Único acceso a red: fetch --all --prune
+                    // Único acceso a red: fetch --all --prune.
+                    // Abortamos si falla: sin fetch correcto no se puede afirmar "al día".
                     let mut fetch_cmd = git_network_cmd(&path_str);
                     fetch_cmd.args(["fetch", "--all", "--prune"]);
-                    if let Err(e) = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT) {
-                        results.lock().unwrap().push(PullResult {
-                            project_name,
-                            success: false,
-                            message: e,
-                        });
-                        return;
+                    match run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT) {
+                        Ok(out) if out.status.success() => {}
+                        Ok(out) => {
+                            let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                            results.lock().unwrap().push(PullResult {
+                                project_name,
+                                success: false,
+                                message: format!("No se pudo consultar el remoto: {}", err),
+                            });
+                            return;
+                        }
+                        Err(e) => {
+                            results.lock().unwrap().push(PullResult {
+                                project_name,
+                                success: false,
+                                message: e,
+                            });
+                            return;
+                        }
                     }
 
                     // Avanzar rama actual al upstream descargado (sin red)
