@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { invoke } from '@tauri-apps/api/core';
 import type {
   AppStore,
   Project,
@@ -234,138 +233,11 @@ export const useStore = create<AppStore>()(
           get().addToast({
             type: 'error',
             title: 'Error de escaneo',
-            message: 'No se pudieron escanear los proyectos',
+            message: String(error) || 'No se pudieron escanear los proyectos',
           });
         } finally {
           set({ isLoading: false });
         }
-      },
-
-      // Pull all projects in current environment
-      pullAllProjects: async () => {
-        const { projects } = get();
-        const gitProjects = projects.filter(p => p.hasGit);
-        if (gitProjects.length === 0) {
-          get().addToast({
-            type: 'warning',
-            title: 'Sin proyectos',
-            message: 'No hay proyectos Git para actualizar',
-          });
-          return;
-        }
-
-        set({ isLoading: true });
-        const startTime = Date.now();
-        const results = { success: 0, failed: 0 };
-
-        for (const project of gitProjects) {
-          try {
-            await invoke('git_pull', { projectPath: project.path });
-            results.success++;
-          } catch (error) {
-            results.failed++;
-            get().addGitOperation({
-              type: 'pull',
-              status: 'error',
-              message: `Error en pull de ${project.name}`,
-              projectName: project.name,
-              details: String(error),
-              duration: Date.now() - startTime,
-            });
-          }
-        }
-
-        set({ isLoading: false });
-
-        if (results.success > 0) {
-          get().addToast({
-            type: 'success',
-            title: 'Pull completado',
-            message: `${results.success} proyectos actualizados${results.failed > 0 ? `, ${results.failed} fallaron` : ''}`,
-          });
-        } else {
-          get().addToast({
-            type: 'error',
-            title: 'Error',
-            message: `Todos los pulls fallaron (${results.failed})`,
-          });
-        }
-
-        // Rescan after pull
-        await get().scanCurrentEnvironment();
-      },
-
-      // Fetch all projects from ALL environments
-      fetchAllProjects: async () => {
-        const { config } = get();
-        if (!config || config.environments.length === 0) {
-          get().addToast({
-            type: 'warning',
-            title: 'Sin entornos',
-            message: 'No hay entornos configurados',
-          });
-          return;
-        }
-
-        set({ isLoading: true });
-        const startTime = Date.now();
-        const results = { success: 0, failed: 0, total: 0 };
-
-        // Iterate through all environments and their projects
-        for (const environment of config.environments) {
-          try {
-            const envProjects = await invoke<Project[]>('scan_projects', {
-              basePath: environment.basePath,
-            });
-
-            for (const project of envProjects) {
-              if (!project.hasGit) continue;
-              results.total++;
-
-              try {
-                await invoke('git_fetch', { projectPath: project.path });
-                results.success++;
-              } catch (error) {
-                results.failed++;
-                console.error(`Fetch failed for ${project.name}:`, error);
-              }
-            }
-          } catch (error) {
-            console.error(`Error scanning environment ${environment.name}:`, error);
-          }
-        }
-
-        set({ isLoading: false });
-
-        if (results.success > 0) {
-          get().addToast({
-            type: 'success',
-            title: 'Sincronización completada',
-            message: `${results.success} de ${results.total} repositorios actualizados${results.failed > 0 ? ` (${results.failed} fallaron)` : ''}`,
-          });
-
-          get().addGitOperation({
-            type: 'fetch',
-            status: 'success',
-            message: `Fetch de ${results.success} repositorios en todos los entornos`,
-            duration: Date.now() - startTime,
-          });
-        } else if (results.total > 0) {
-          get().addToast({
-            type: 'error',
-            title: 'Error',
-            message: `No se pudo actualizar ningún repositorio (${results.failed} fallaron)`,
-          });
-        } else {
-          get().addToast({
-            type: 'warning',
-            title: 'Sin repositorios',
-            message: 'No se encontraron repositorios Git en ningún entorno',
-          });
-        }
-
-        // Rescan current environment to update status
-        await get().scanCurrentEnvironment();
       },
 
       // Environment actions
@@ -391,6 +263,8 @@ export const useStore = create<AppStore>()(
         set((state) => ({
           environments: [...state.environments, newEnv],
           activeEnvironmentId: newEnv.id, // Set new environment as active
+          projects: [], // Clear projects from previous environment
+          searchQuery: '',
         }));
         get().saveConfig();
         get().addToast({

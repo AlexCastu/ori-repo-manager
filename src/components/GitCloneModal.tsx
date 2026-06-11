@@ -126,7 +126,7 @@ export function GitCloneModal() {
                   type="text"
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
-                  placeholder={`https://${data.gitServer}/usuario/repo.git`}
+                  placeholder={`https://${(data.gitServer || 'github.com').replace(/^https?:\/\//, '')}/usuario/repo.git`}
                   className="input-base pl-10"
                   disabled={status === 'cloning'}
                 />

@@ -3,7 +3,13 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::{apply_no_window, run_with_timeout, GIT_NETWORK_TIMEOUT};
+use crate::{
+    apply_no_window, fast_forward_other_branches, git_network_cmd, run_with_timeout,
+    GIT_NETWORK_TIMEOUT,
+};
+
+/// Repos procesados en paralelo por lote
+const BATCH_CHUNK_SIZE: usize = 8;
 
 // ==================== BATCH OPERATIONS ====================
 
@@ -14,7 +20,7 @@ pub async fn batch_git_fetch(
     info!("Batch fetch iniciado: {} repositorios", project_paths.len());
     let results = Arc::new(Mutex::new(Vec::new()));
 
-    for chunk in project_paths.chunks(4) {
+    for chunk in project_paths.chunks(BATCH_CHUNK_SIZE) {
         let handles: Vec<_> = chunk
             .iter()
             .map(|path| {
@@ -22,14 +28,20 @@ pub async fn batch_git_fetch(
                 let results = Arc::clone(&results);
 
                 thread::spawn(move || {
-                    let mut cmd = Command::new("git");
-                    cmd.current_dir(&path).args(["fetch", "--all", "--prune"]);
-                    apply_no_window(&mut cmd);
+                    let mut cmd = git_network_cmd(&path);
+                    cmd.args(["fetch", "--all", "--prune"]);
 
                     let result = match run_with_timeout(&mut cmd, GIT_NETWORK_TIMEOUT) {
                         Ok(out) => {
                             if out.status.success() {
-                                Ok("Fetch completed".to_string())
+                                // stderr de fetch trae el detalle de refs actualizadas;
+                                // se usa en auto-sync para detectar novedades
+                                let detail = String::from_utf8_lossy(&out.stderr).to_string();
+                                if detail.trim().is_empty() {
+                                    Ok("Fetch completed".to_string())
+                                } else {
+                                    Ok(format!("Fetch completed\n{}", detail.trim()))
+                                }
                             } else {
                                 Err(String::from_utf8_lossy(&out.stderr).to_string())
                             }
@@ -62,7 +74,7 @@ pub async fn batch_git_pull(
     info!("Batch pull iniciado: {} repositorios", project_paths.len());
     let results = Arc::new(Mutex::new(Vec::new()));
 
-    for chunk in project_paths.chunks(4) {
+    for chunk in project_paths.chunks(BATCH_CHUNK_SIZE) {
         let handles: Vec<_> = chunk
             .iter()
             .map(|path| {
@@ -70,28 +82,39 @@ pub async fn batch_git_pull(
                 let results = Arc::clone(&results);
 
                 thread::spawn(move || {
-                    // First: fetch --all --prune
-                    let mut fetch_cmd = Command::new("git");
-                    fetch_cmd
+                    // Único acceso a red: fetch --all --prune
+                    let mut fetch_cmd = git_network_cmd(&path);
+                    fetch_cmd.args(["fetch", "--all", "--prune"]);
+                    if let Err(e) = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT) {
+                        results.lock().unwrap().push((path, Err(e)));
+                        return;
+                    }
+
+                    // Avanzar rama actual al upstream descargado (sin red, solo fast-forward)
+                    let mut merge_cmd = Command::new("git");
+                    merge_cmd
                         .current_dir(&path)
-                        .args(["fetch", "--all", "--prune"]);
-                    apply_no_window(&mut fetch_cmd);
-                    let _ = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT);
+                        .args(["merge", "--ff-only", "@{u}"]);
+                    apply_no_window(&mut merge_cmd);
 
-                    // Then: pull (fast-forward only, no forced merge)
-                    let mut pull_cmd = Command::new("git");
-                    pull_cmd.current_dir(&path).args(["pull", "--ff-only"]);
-                    apply_no_window(&mut pull_cmd);
-
-                    let result = match run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT) {
+                    let result = match merge_cmd.output() {
                         Ok(out) => {
                             if out.status.success() {
-                                Ok(String::from_utf8_lossy(&out.stdout).to_string())
+                                // Resto de ramas locales: fast-forward sin red
+                                let extra = fast_forward_other_branches(&path);
+                                let mut msg = String::from_utf8_lossy(&out.stdout).to_string();
+                                if !extra.is_empty() {
+                                    msg.push_str(&format!(
+                                        "\n{} ramas locales actualizadas",
+                                        extra.len()
+                                    ));
+                                }
+                                Ok(msg)
                             } else {
                                 Err(String::from_utf8_lossy(&out.stderr).to_string())
                             }
                         }
-                        Err(e) => Err(e),
+                        Err(e) => Err(format!("Failed to merge: {}", e)),
                     };
 
                     results.lock().unwrap().push((path, result));
@@ -121,7 +144,7 @@ pub async fn batch_git_push(
     info!("Batch push iniciado: {} repositorios", project_paths.len());
     let results = Arc::new(Mutex::new(Vec::new()));
 
-    for chunk in project_paths.chunks(4) {
+    for chunk in project_paths.chunks(BATCH_CHUNK_SIZE) {
         let handles: Vec<_> = chunk
             .iter()
             .map(|path| {
@@ -129,9 +152,8 @@ pub async fn batch_git_push(
                 let results = Arc::clone(&results);
 
                 thread::spawn(move || {
-                    let mut cmd = Command::new("git");
-                    cmd.current_dir(&path).args(["push"]);
-                    apply_no_window(&mut cmd);
+                    let mut cmd = git_network_cmd(&path);
+                    cmd.args(["push"]);
 
                     let result = match run_with_timeout(&mut cmd, GIT_NETWORK_TIMEOUT) {
                         Ok(out) => {
