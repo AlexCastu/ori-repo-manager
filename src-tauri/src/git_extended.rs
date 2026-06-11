@@ -1,5 +1,6 @@
 use crate::{
-    apply_no_window, run_with_timeout, validate_branch_name, validate_git_repo, GIT_NETWORK_TIMEOUT,
+    apply_no_window, git_network_cmd, run_with_timeout, validate_branch_name, validate_git_repo,
+    GIT_NETWORK_TIMEOUT,
 };
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -512,8 +513,7 @@ pub async fn git_push(project_path: String, force: bool) -> Result<String, Strin
         project_path, branch, force
     );
 
-    let mut cmd = Command::new("git");
-    cmd.current_dir(&project_path);
+    let mut cmd = git_network_cmd(&project_path);
 
     if force {
         warn!("Push forzado en: {} [rama: {}]", project_path, branch);
@@ -521,7 +521,6 @@ pub async fn git_push(project_path: String, force: bool) -> Result<String, Strin
     } else {
         cmd.args(["push"]);
     }
-    apply_no_window(&mut cmd);
 
     let output = run_with_timeout(&mut cmd, GIT_NETWORK_TIMEOUT)?;
 

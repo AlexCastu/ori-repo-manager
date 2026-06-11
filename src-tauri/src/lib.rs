@@ -298,24 +298,62 @@ pub fn apply_no_window(_cmd: &mut Command) {
     // No-op on non-Windows
 }
 
+/// Crea un Command de git para operaciones de red: oculta ventana en Windows
+/// y desactiva prompts de credenciales en terminal (evita cuelgues en apps GUI).
+pub fn git_network_cmd(working_dir: &str) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(working_dir);
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
+    apply_no_window(&mut cmd);
+    cmd
+}
+
 /// Run a Command with a timeout. Returns the Output or an error if it times out.
+/// stdout/stderr van por pipes drenados en threads: sin esto la salida llega
+/// vacía (errores de git invisibles) y el proceso puede bloquearse con buffers llenos.
 pub fn run_with_timeout(
     cmd: &mut Command,
     timeout: Duration,
 ) -> Result<std::process::Output, String> {
+    use std::io::Read;
+    use std::process::Stdio;
+
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
+    let mut stdout_pipe = child.stdout.take();
+    let mut stderr_pipe = child.stderr.take();
+    let stdout_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(ref mut pipe) = stdout_pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        buf
+    });
+    let stderr_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(ref mut pipe) = stderr_pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        buf
+    });
+
     let start = std::time::Instant::now();
     loop {
         match child.try_wait() {
-            Ok(Some(_status)) => {
-                // Process finished — collect output
-                let output = child
-                    .wait_with_output()
-                    .map_err(|e| format!("Failed to read output: {}", e))?;
-                return Ok(output);
+            Ok(Some(status)) => {
+                let stdout = stdout_reader.join().unwrap_or_default();
+                let stderr = stderr_reader.join().unwrap_or_default();
+                return Ok(std::process::Output {
+                    status,
+                    stdout,
+                    stderr,
+                });
             }
             Ok(None) => {
                 if start.elapsed() > timeout {
@@ -326,15 +364,18 @@ pub fn run_with_timeout(
                             .to_string(),
                     );
                 }
-                std::thread::sleep(Duration::from_millis(200));
+                std::thread::sleep(Duration::from_millis(100));
             }
             Err(e) => return Err(format!("Error waiting for process: {}", e)),
         }
     }
 }
 
-/// Default timeout for network git operations (15 seconds)
-pub const GIT_NETWORK_TIMEOUT: Duration = Duration::from_secs(15);
+/// Default timeout for network git operations (30 seconds)
+pub const GIT_NETWORK_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Timeout para clones (repos grandes pueden tardar varios minutos)
+pub const GIT_CLONE_TIMEOUT: Duration = Duration::from_secs(300);
 
 #[tauri::command]
 async fn get_git_remote_url(project_path: String) -> Result<Option<String>, String> {
@@ -369,12 +410,24 @@ async fn git_clone(repo_url: String, destination: String) -> Result<String, Stri
             .map_err(|e| format!("No se pudo crear el directorio destino: {}", e))?;
     }
 
-    let mut cmd = Command::new("git");
-    cmd.current_dir(&destination).args(["clone", &repo_url]);
-    apply_no_window(&mut cmd);
+    // Aviso temprano si la carpeta del repo ya existe en el destino
+    let repo_dir_name = url_trimmed
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(".git");
+    if !repo_dir_name.is_empty() && dest.join(repo_dir_name).exists() {
+        return Err(format!(
+            "La carpeta '{}' ya existe en el directorio destino",
+            repo_dir_name
+        ));
+    }
 
-    // Clone can take longer — use 120 second timeout
-    let output = run_with_timeout(&mut cmd, Duration::from_secs(120))?;
+    let mut cmd = git_network_cmd(&destination);
+    cmd.args(["clone", &repo_url]);
+
+    let output = run_with_timeout(&mut cmd, GIT_CLONE_TIMEOUT)?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -390,6 +443,70 @@ async fn git_clone(repo_url: String, destination: String) -> Result<String, Stri
         error!("Clone fallido para {}: {}", repo_url, err);
         Err(err)
     }
+}
+
+/// Tras un fetch, hace fast-forward de todas las ramas locales con upstream
+/// (excepto la actual). Operación local, sin red. Devuelve líneas de log.
+fn fast_forward_other_branches(project_path: &str) -> Vec<String> {
+    let mut log_lines = Vec::new();
+
+    let mut refs_cmd = Command::new("git");
+    refs_cmd.current_dir(project_path).args([
+        "for-each-ref",
+        "refs/heads",
+        "--format=%(HEAD)|%(refname:short)|%(upstream:short)",
+    ]);
+    apply_no_window(&mut refs_cmd);
+
+    let refs_output = match refs_cmd.output() {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => return log_lines,
+    };
+
+    for line in refs_output.lines() {
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() != 3 {
+            continue;
+        }
+        let is_current = parts[0] == "*";
+        let branch = parts[1].trim();
+        let upstream = parts[2].trim();
+
+        // La rama actual se actualiza con merge --ff-only; sin upstream no hay nada que hacer
+        if is_current || branch.is_empty() || upstream.is_empty() {
+            continue;
+        }
+
+        // fetch desde el propio repo ('.'): actualiza la rama local al remote-tracking
+        // ya descargado. Solo fast-forward; sin red.
+        let mut ff_cmd = Command::new("git");
+        ff_cmd
+            .current_dir(project_path)
+            .args(["fetch", ".", &format!("{}:{}", upstream, branch)]);
+        apply_no_window(&mut ff_cmd);
+
+        match ff_cmd.output() {
+            Ok(out) if out.status.success() => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                // git informa por stderr: "abc123..def456  origin/x -> x" cuando avanza
+                if stderr.contains("->") && !stderr.contains("[up to date]") {
+                    log_lines.push(format!("  ↳ {} actualizada desde {}", branch, upstream));
+                }
+            }
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                if stderr.contains("non-fast-forward") || stderr.contains("rejected") {
+                    log_lines.push(format!(
+                        "  ↳ {} omitida (divergida del remoto, requiere merge manual)",
+                        branch
+                    ));
+                }
+            }
+            Err(_) => {}
+        }
+    }
+
+    log_lines
 }
 
 #[tauri::command]
@@ -419,35 +536,43 @@ async fn git_pull(project_path: String) -> Result<String, String> {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default();
 
-    // Fetch all remotes
-    let mut fetch_cmd = Command::new("git");
-    fetch_cmd
-        .current_dir(&project_path)
-        .args(["fetch", "--all", "--prune"]);
-    apply_no_window(&mut fetch_cmd);
+    // Único acceso a red: fetch de todos los remotos
+    let mut fetch_cmd = git_network_cmd(&project_path);
+    fetch_cmd.args(["fetch", "--all", "--prune"]);
     let fetch_output = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT)?;
     let fetch_info = String::from_utf8_lossy(&fetch_output.stderr).to_string();
 
-    // Pull (fast-forward only)
-    let mut pull_cmd = Command::new("git");
-    pull_cmd
+    // Avanzar la rama actual al upstream ya descargado (sin red, solo fast-forward)
+    let mut merge_cmd = Command::new("git");
+    merge_cmd
         .current_dir(&project_path)
-        .args(["pull", "--ff-only"]);
-    apply_no_window(&mut pull_cmd);
-    let pull_output = run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT)?;
+        .args(["merge", "--ff-only", "@{u}"]);
+    apply_no_window(&mut merge_cmd);
+    let merge_output = merge_cmd
+        .output()
+        .map_err(|e| format!("Failed to merge: {}", e))?;
 
-    if !pull_output.status.success() {
-        let err = String::from_utf8_lossy(&pull_output.stderr).to_string();
+    if !merge_output.status.success() {
+        let err = String::from_utf8_lossy(&merge_output.stderr).to_string();
         error!(
             "Pull fallido en {} (rama {}): {}",
             project_path, branch, err
         );
+        if err.contains("no upstream") || err.contains("no tracking information") {
+            return Err(format!(
+                "La rama '{}' no tiene upstream configurado en el remoto",
+                branch
+            ));
+        }
         return Err(err);
     }
 
-    let pull_stdout = String::from_utf8_lossy(&pull_output.stdout).to_string();
+    let merge_stdout = String::from_utf8_lossy(&merge_output.stdout).to_string();
     let up_to_date =
-        pull_stdout.contains("Already up to date") || pull_stdout.contains("Already up-to-date");
+        merge_stdout.contains("Already up to date") || merge_stdout.contains("Already up-to-date");
+
+    // Actualizar también el resto de ramas locales (fast-forward, sin red)
+    let other_branches_log = fast_forward_other_branches(&project_path);
 
     let mut log = format!("📌 Rama: {}\n", branch);
 
@@ -511,6 +636,14 @@ async fn git_pull(project_path: String) -> Result<String, String> {
             "Pull completado con cambios en: {} [{}]",
             project_path, branch
         );
+    }
+
+    if !other_branches_log.is_empty() {
+        log.push_str("\n🌿 Otras ramas locales:\n");
+        for line in &other_branches_log {
+            log.push_str(line);
+            log.push('\n');
+        }
     }
 
     Ok(log)
@@ -643,8 +776,8 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
 
     let results = Arc::new(Mutex::new(Vec::new()));
 
-    // Process in parallel chunks of 4
-    for chunk in projects.chunks(4) {
+    // Process in parallel chunks of 8
+    for chunk in projects.chunks(8) {
         let handles: Vec<_> = chunk
             .iter()
             .map(|(name, path)| {
@@ -653,32 +786,47 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
                 let results = Arc::clone(&results);
 
                 thread::spawn(move || {
-                    // First: fetch --all --prune (clean stale remote branches)
-                    let mut fetch_cmd = Command::new("git");
-                    fetch_cmd
-                        .current_dir(&project_path)
-                        .args(["fetch", "--all", "--prune"]);
-                    apply_no_window(&mut fetch_cmd);
-                    let _ = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT);
+                    let path_str = project_path.to_string_lossy().to_string();
 
-                    // Then: pull (fast-forward only, no forced merge)
-                    let mut pull_cmd = Command::new("git");
-                    pull_cmd
-                        .current_dir(&project_path)
-                        .args(["pull", "--ff-only"]);
-                    apply_no_window(&mut pull_cmd);
+                    // Único acceso a red: fetch --all --prune
+                    let mut fetch_cmd = git_network_cmd(&path_str);
+                    fetch_cmd.args(["fetch", "--all", "--prune"]);
+                    if let Err(e) = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT) {
+                        results.lock().unwrap().push(PullResult {
+                            project_name,
+                            success: false,
+                            message: e,
+                        });
+                        return;
+                    }
 
-                    let result = match run_with_timeout(&mut pull_cmd, GIT_NETWORK_TIMEOUT) {
+                    // Avanzar rama actual al upstream descargado (sin red)
+                    let mut merge_cmd = Command::new("git");
+                    merge_cmd
+                        .current_dir(&project_path)
+                        .args(["merge", "--ff-only", "@{u}"]);
+                    apply_no_window(&mut merge_cmd);
+
+                    let result = match merge_cmd.output() {
                         Ok(out) => {
                             if out.status.success() {
                                 let msg = String::from_utf8_lossy(&out.stdout).to_string();
+
+                                // Actualizar el resto de ramas locales (fast-forward)
+                                let extra = fast_forward_other_branches(&path_str);
+                                let extra_note = if extra.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!(" (+{} ramas locales actualizadas)", extra.len())
+                                };
+
                                 if msg.contains("Already up to date")
                                     || msg.contains("Already up-to-date")
                                 {
                                     PullResult {
                                         project_name,
                                         success: true,
-                                        message: "Ya actualizado".to_string(),
+                                        message: format!("Ya actualizado{}", extra_note),
                                     }
                                 } else {
                                     // Obtener estadísticas del pull
@@ -696,10 +844,10 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
                                         .unwrap_or_default();
 
                                     let summary = if detail.trim().is_empty() {
-                                        "Actualizado correctamente".to_string()
+                                        format!("Actualizado correctamente{}", extra_note)
                                     } else {
                                         let last_line = detail.lines().last().unwrap_or("").trim();
-                                        format!("Actualizado: {}", last_line)
+                                        format!("Actualizado: {}{}", last_line, extra_note)
                                     };
 
                                     PullResult {
@@ -719,7 +867,7 @@ async fn pull_all_projects(base_path: String) -> Result<Vec<PullResult>, String>
                         Err(e) => PullResult {
                             project_name,
                             success: false,
-                            message: e,
+                            message: format!("Failed to merge: {}", e),
                         },
                     };
 
@@ -1011,10 +1159,8 @@ async fn git_fetch(project_path: String) -> Result<String, String> {
     validate_git_repo(&project_path)?;
     info!("Fetch iniciado en: {}", project_path);
 
-    let mut cmd = Command::new("git");
-    cmd.current_dir(&project_path)
-        .args(["fetch", "--all", "--prune"]);
-    apply_no_window(&mut cmd);
+    let mut cmd = git_network_cmd(&project_path);
+    cmd.args(["fetch", "--all", "--prune"]);
 
     let output = run_with_timeout(&mut cmd, GIT_NETWORK_TIMEOUT)?;
 
