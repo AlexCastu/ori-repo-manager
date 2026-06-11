@@ -82,12 +82,24 @@ pub async fn batch_git_pull(
                 let results = Arc::clone(&results);
 
                 thread::spawn(move || {
-                    // Único acceso a red: fetch --all --prune
+                    // Único acceso a red: fetch --all --prune.
+                    // Abortamos si falla: sin fetch correcto no se puede afirmar "al día".
                     let mut fetch_cmd = git_network_cmd(&path);
                     fetch_cmd.args(["fetch", "--all", "--prune"]);
-                    if let Err(e) = run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT) {
-                        results.lock().unwrap().push((path, Err(e)));
-                        return;
+                    match run_with_timeout(&mut fetch_cmd, GIT_NETWORK_TIMEOUT) {
+                        Ok(out) if out.status.success() => {}
+                        Ok(out) => {
+                            let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                            results.lock().unwrap().push((
+                                path,
+                                Err(format!("No se pudo consultar el remoto: {}", err)),
+                            ));
+                            return;
+                        }
+                        Err(e) => {
+                            results.lock().unwrap().push((path, Err(e)));
+                            return;
+                        }
                     }
 
                     // Avanzar rama actual al upstream descargado (sin red, solo fast-forward)
