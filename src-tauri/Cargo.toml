@@ -1,6 +1,6 @@
 [package]
 name = "ori-repo-manager"
-version = "2.0.0"
+version = "2.3.0"
 description = "ORI-RepoManager - Gestión de repositorios Git"
 authors = ["Alex Constantin Castu (ORI)"]
 license = "MIT"
