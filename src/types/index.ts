@@ -286,8 +286,6 @@ export type AppStore = EnvironmentsSlice & ProjectsSlice & FavoritesSlice & Proj
   initialize: () => Promise<void>;
   saveConfig: () => Promise<void>;
   scanCurrentEnvironment: (silent?: boolean) => Promise<void>;
-  pullAllProjects: () => Promise<void>;
-  fetchAllProjects: () => Promise<void>;
 };
 
 // ==================== EXTENDED GIT TYPES ====================

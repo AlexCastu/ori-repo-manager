@@ -124,12 +124,13 @@ export function ProjectGrid() {
       const startTime = Date.now();
       const apiResults = await pullAllProjectsApi(activeEnvironment.basePath);
 
-      // Convert API results to modal format
+      // Convert API results to modal format (mensaje real del backend: "Ya actualizado",
+      // "Actualizado: N files changed...", o el error de git)
       const results: PullResult[] = apiResults.map(r => ({
         projectName: r.project_name,
         projectPath: r.project_name,
         success: r.success,
-        message: r.success ? 'Pull completado correctamente' : 'Error en el pull',
+        message: r.success ? (r.message || 'Pull completado correctamente') : 'Error en el pull',
         details: r.success ? undefined : r.message,
         duration: Date.now() - startTime,
       }));

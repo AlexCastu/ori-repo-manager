@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import type { AppConfig, Environment, Project, GitStatus, EnvironmentColor, EnvironmentIcon, GitBranch, GitCommit, GitStash, FileChange } from '../types';
 import { defaultEnvironmentColor, defaultEnvironmentIcon } from './colors';
 
@@ -49,7 +50,10 @@ export async function openInExplorer(projectPath: string): Promise<void> {
 }
 
 export async function selectDirectory(): Promise<string | null> {
-  return invoke<string | null>('select_directory');
+  // API JS del plugin dialog: funciona de forma fiable en Windows, macOS y Linux
+  // (el comando Rust con blocking_pick_folder fallaba en macOS)
+  const selected = await openDialog({ directory: true, multiple: false });
+  return typeof selected === 'string' ? selected : null;
 }
 
 export async function checkPathExists(path: string): Promise<boolean> {
